@@ -2,17 +2,22 @@ package no.spinapp.core
 
 import kotlin.math.roundToInt
 
-/** Treningssoner i prosent av FTP (Coggan). */
-enum class Zone(val label: String, val lowPct: Int, val highPct: Int, val argb: Long) {
-    Z1("Z1 Restitusjon", 0, 55, 0xFF7E8A97),
-    Z2("Z2 Utholdenhet", 56, 75, 0xFF2E86DE),
-    Z3("Z3 Tempo", 76, 90, 0xFF10AC84),
-    Z4("Z4 Terskel", 91, 105, 0xFFF5B800),
-    Z5("Z5 VO2maks", 106, 120, 0xFFEE5A24),
-    Z6("Z6 Anaerob", 121, 999, 0xFFC0392B);
+/**
+ * Treningssoner i prosent av FTP (FTP = 100 %). Fargene går fra lett (grå) til
+ * hardest (rød, mørkerød, lilla). 100 % ligger i den oransje terskelsonen.
+ */
+enum class Zone(val label: String, val short: String, val lowPct: Int, val highPct: Int, val argb: Long) {
+    Z1("Z1 Restitusjon", "Lett", 0, 55, 0xFF8A949E),
+    Z2("Z2 Utholdenhet", "Rolig", 56, 75, 0xFF2E86DE),
+    Z3("Z3 Tempo", "Tempo", 76, 87, 0xFF27AE60),
+    Z4("Z4 Sweet spot", "Sweet spot", 88, 94, 0xFFF1C40F),
+    Z5("Z5 Terskel", "Terskel", 95, 105, 0xFFF39C12),
+    Z6("Z6 VO2maks", "Hardt", 106, 120, 0xFFE74C3C),
+    Z7("Z7 Anaerob", "Svært hardt", 121, 150, 0xFF922B21),
+    Z8("Z8 Sprint", "Sprint", 151, 999, 0xFF8E44AD);
 
     companion object {
-        fun forPct(pct: Double): Zone = entries.firstOrNull { pct <= it.highPct + 0.5 } ?: Z6
+        fun forPct(pct: Double): Zone = entries.firstOrNull { pct <= it.highPct + 0.5 } ?: Z8
         fun forPower(watts: Int, ftp: Int): Zone = forPct(watts * 100.0 / ftp)
     }
 }
@@ -26,6 +31,8 @@ data class Segment(
     val cadenceHigh: Int,
     /** Brukes for FTP-test: snittet i dette segmentet gir ny FTP. */
     val isFtpTest: Boolean = false,
+    /** Oppvarming kan hoppes over. */
+    val isWarmup: Boolean = false,
 ) {
     val midPct get() = (powerLowPct + powerHighPct) / 2.0
     val midCadence get() = (cadenceLow + cadenceHigh) / 2
@@ -70,8 +77,8 @@ data class Workout(
 class WorkoutBuilder {
     private val list = mutableListOf<Segment>()
 
-    fun seg(name: String, min: Double, low: Int, high: Int, cad: IntRange, ftpTest: Boolean = false) {
-        list += Segment(name, (min * 60).roundToInt(), low, high, cad.first, cad.last, ftpTest)
+    fun seg(name: String, min: Double, low: Int, high: Int, cad: IntRange, ftpTest: Boolean = false, warmup: Boolean = false) {
+        list += Segment(name, (min * 60).roundToInt(), low, high, cad.first, cad.last, ftpTest, warmup)
     }
 
     fun repeat(times: Int, block: WorkoutBuilder.(Int) -> Unit) {
@@ -79,9 +86,9 @@ class WorkoutBuilder {
     }
 
     fun warmup(min: Int = 10) {
-        seg("Oppvarming", min * 0.5, 45, 55, 80..90)
-        seg("Oppvarming", min * 0.3, 56, 65, 85..95)
-        seg("Oppvarming – høy kadens", min * 0.2, 60, 70, 95..105)
+        seg("Oppvarming", min * 0.5, 45, 55, 80..90, warmup = true)
+        seg("Oppvarming", min * 0.3, 56, 65, 85..95, warmup = true)
+        seg("Oppvarming – høy kadens", min * 0.2, 60, 70, 95..105, warmup = true)
     }
 
     fun cooldown(min: Int = 5) {
@@ -154,7 +161,7 @@ object WorkoutLibrary {
     }
 
     val ftpTest = workout("ftptest", "FTP-test 20 min", "Kjør så hardt du klarer jevnt i 20 min. FTP = 95 % av snittet.") {
-        seg("Oppvarming", 10.0, 50, 65, 85..95)
+        seg("Oppvarming", 10.0, 50, 65, 85..95, warmup = true)
         repeat(3) {
             seg("Rask fot", 1.0, 70, 80, 105..115)
             seg("Rolig", 1.0, 50, 55, 85..95)

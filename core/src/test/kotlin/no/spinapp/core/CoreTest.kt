@@ -165,8 +165,23 @@ class WorkoutTest {
     @Test
     fun zones() {
         assertEquals(Zone.Z2, Zone.forPower(140, 200))
-        assertEquals(Zone.Z4, Zone.forPower(200, 200))
-        assertEquals(Zone.Z6, Zone.forPower(300, 200))
+        assertEquals(Zone.Z5, Zone.forPower(200, 200)) // 100 % = oransje terskel
+        assertEquals(Zone.Z7, Zone.forPower(300, 200))
+        assertEquals(Zone.Z8, Zone.forPower(320, 200))
+    }
+
+    @Test
+    fun skipWarmup() {
+        val s = RideSession(WorkoutLibrary.threshold, 200)
+        assertTrue(s.inWarmup())
+        s.tick(null)
+        assertTrue(s.skipWarmup())
+        val st = s.state(null)
+        assertEquals("Terskel 1/3", st.segment?.name)
+        assertTrue(!s.inWarmup())
+        assertTrue(!s.skipWarmup())
+        assertEquals(1, s.summary().durationSec)
+        assertTrue(!RideSession(WorkoutLibrary.recovery, 200).inWarmup())
     }
 
     @Test

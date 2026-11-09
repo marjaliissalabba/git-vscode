@@ -113,6 +113,22 @@ class RideSession(val workout: Workout, val ftp: Int) {
         return state(sample)
     }
 
+    /** Er vi i oppvarmingen nå? */
+    fun inWarmup(): Boolean {
+        val loc = workout.locate(elapsedSec) ?: return false
+        return workout.segments[loc.first].isWarmup
+    }
+
+    /** Hopper til første del etter oppvarmingen. Returnerer true hvis noe ble hoppet over. */
+    fun skipWarmup(): Boolean {
+        val loc = workout.locate(elapsedSec) ?: return false
+        if (!workout.segments[loc.first].isWarmup) return false
+        var i = loc.first
+        while (i < workout.segments.size && workout.segments[i].isWarmup) i++
+        elapsedSec = workout.startOf(i)
+        return true
+    }
+
     fun summary(): RideSummary {
         val n = powerLog.size
         val avgP = if (n == 0) 0 else powerLog.average().roundToInt()

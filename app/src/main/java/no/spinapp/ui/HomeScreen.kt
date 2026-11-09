@@ -239,7 +239,7 @@ private fun ZoneLegend(ftp: Int) {
                 val high = ftp * z.highPct / 100
                 val range = when (z) {
                     Zone.Z1 -> "under ${ftp * 55 / 100} W"
-                    Zone.Z6 -> "over $low W"
+                    Zone.Z8 -> "over $low W"
                     else -> "$low–$high W"
                 }
                 Text("${z.label}: $range", fontSize = 13.sp)

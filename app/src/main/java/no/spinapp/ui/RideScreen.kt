@@ -10,12 +10,11 @@ import android.os.VibratorManager
 import android.speech.tts.TextToSpeech
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -51,14 +50,12 @@ import no.spinapp.MainActivity
 import no.spinapp.core.RideSession
 import no.spinapp.core.RideState
 import no.spinapp.core.RideSummary
-import no.spinapp.core.TargetStatus
 import no.spinapp.core.Workout
 import no.spinapp.sources.freshSample
 import java.util.Locale
 
 private val GOOD = Color(0xFF2ECC71)
 private val WARN = Color(0xFFF5B800)
-private val BAD = Color(0xFFE74C3C)
 
 fun formatTime(sec: Int): String {
     val s = sec.coerceAtLeast(0)
@@ -132,68 +129,80 @@ fun RideScreen(activity: MainActivity, workout: Workout, onFinished: (RideSummar
             .background(Color(0xFF0B0E11))
             .statusBarsPadding()
             .navigationBarsPadding()
-            .padding(12.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        // Topp: økt og tid
+        // Topp: økt og total tid
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text(workout.name, fontSize = 16.sp, color = Color.Gray)
+                Text(workout.name, fontSize = 14.sp, color = Color.Gray)
                 Text(seg?.name ?: "Ferdig", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = zoneColor)
             }
             Column(horizontalAlignment = Alignment.End) {
-                Text("Igjen av økta", fontSize = 12.sp, color = Color.Gray)
-                Text(formatTime(state.totalRemainingSec), fontSize = 18.sp, fontFamily = FontFamily.Monospace)
+                Text("IGJEN AV ØKTA", fontSize = 11.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
+                Text(formatTime(state.totalRemainingSec), fontSize = 20.sp, color = Color.White, fontFamily = FontFamily.Monospace)
             }
         }
 
-        // Nedtelling i segmentet
-        Box(
+        // Intervall-tid og neste intervall
+        Row(
             Modifier
                 .fillMaxWidth()
                 .background(zoneColor.copy(alpha = 0.18f), RoundedCornerShape(16.dp))
-                .padding(vertical = 6.dp),
-            contentAlignment = Alignment.Center,
+                .padding(horizontal = 14.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Column(Modifier.weight(1f)) {
+                Text("DETTE INTERVALLET", fontSize = 11.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
                 Text(
                     formatTime(state.segmentRemainingSec),
-                    fontSize = 56.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace,
+                    fontSize = 50.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, color = Color.White,
                 )
-                Text(seg?.zone?.label ?: "", color = zoneColor, fontSize = 14.sp)
+            }
+            val n = state.nextSegment
+            Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    Modifier
+                        .width(6.dp)
+                        .height(64.dp)
+                        .background(n?.let { Color(it.zone.argb) } ?: Color.DarkGray, RoundedCornerShape(3.dp))
+                )
+                Column(Modifier.padding(start = 10.dp)) {
+                    Text("NESTE", fontSize = 11.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
+                    if (n != null) {
+                        Text(n.name, fontSize = 16.sp, color = Color.White, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                        Text("${formatTime(n.durationSec)} · ${n.powerLowPct}–${n.powerHighPct}%", fontSize = 15.sp, color = Color(n.zone.argb))
+                        Text("${n.cadenceLow}–${n.cadenceHigh} rpm", fontSize = 14.sp, color = Color.LightGray)
+                    } else {
+                        Text("Siste intervall!", fontSize = 16.sp, color = Color.White)
+                    }
+                }
             }
         }
 
-        // Watt og kadens
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            MetricTile(
-                label = "WATT",
-                value = state.powerW,
-                target = if (seg != null) "${state.targetPowerLow}–${state.targetPowerHigh}" else "–",
-                status = state.powerStatus,
-                modifier = Modifier.weight(1f),
-            )
-            MetricTile(
-                label = "RPM",
-                value = state.cadenceRpm,
-                target = if (seg != null) "${seg.cadenceLow}–${seg.cadenceHigh}" else "–",
-                status = state.cadenceStatus,
-                modifier = Modifier.weight(1f),
-            )
-        }
+        // Rund måler: % av FTP og kadens
+        PowerGauge(
+            ftp = ftp,
+            powerW = state.powerW,
+            targetLowPct = seg?.powerLowPct,
+            targetHighPct = seg?.powerHighPct,
+            cadence = state.cadenceRpm,
+            cadenceLow = seg?.cadenceLow,
+            cadenceHigh = seg?.cadenceHigh,
+            powerStatus = state.powerStatus,
+            cadenceStatus = state.cadenceStatus,
+            modifier = Modifier.fillMaxWidth().weight(1f),
+        )
 
-        // Neste
-        state.nextSegment?.let { n ->
-            Text(
-                "Neste: ${n.name} · ${formatTime(n.durationSec)} · ${n.powerLow(ftp)}–${n.powerHigh(ftp)} W · ${n.cadenceLow}–${n.cadenceHigh} rpm",
-                color = Color.LightGray, fontSize = 14.sp,
-            )
-        }
-
-        WorkoutProfile(workout, ftp, state.elapsedSec, Modifier.fillMaxWidth().height(70.dp))
-
+        WorkoutProfile(workout, ftp, state.elapsedSec, Modifier.fillMaxWidth().height(56.dp))
         Text(sourceStatus, color = Color.Gray, fontSize = 12.sp)
-        Spacer(Modifier.weight(1f))
+
+        if (session.inWarmup()) {
+            OutlinedButton(
+                onClick = { if (session.skipWarmup()) state = session.state(source?.freshSample()) },
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text("Hopp over oppvarming ⏭", fontSize = 16.sp) }
+        }
 
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Button(
@@ -218,36 +227,6 @@ fun RideScreen(activity: MainActivity, workout: Workout, onFinished: (RideSummar
                 modifier = Modifier.weight(1f).height(56.dp),
             ) { Text(if (confirmStop) "Trykk igjen for å avslutte" else "Avslutt", fontSize = 14.sp) }
         }
-    }
-}
-
-@Composable
-private fun MetricTile(label: String, value: Int?, target: String, status: TargetStatus, modifier: Modifier) {
-    val color = when (status) {
-        TargetStatus.IN_RANGE -> GOOD
-        TargetStatus.LOW, TargetStatus.HIGH -> if (value == null) Color.Gray else BAD
-        TargetStatus.NO_DATA -> Color.Gray
-    }
-    val hint = when (status) {
-        TargetStatus.LOW -> "▲ Øk"
-        TargetStatus.HIGH -> "▼ Senk"
-        TargetStatus.IN_RANGE -> "✓ Perfekt"
-        TargetStatus.NO_DATA -> "Ingen data"
-    }
-    Column(
-        modifier
-            .border(3.dp, color, RoundedCornerShape(16.dp))
-            .background(color.copy(alpha = 0.10f), RoundedCornerShape(16.dp))
-            .padding(10.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text(label, color = Color.Gray, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-        Text(
-            value?.toString() ?: "–",
-            fontSize = 72.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace,
-        )
-        Text("Mål $target", fontSize = 18.sp, color = Color.White)
-        Text(hint, fontSize = 18.sp, color = color, fontWeight = FontWeight.Bold)
     }
 }
 

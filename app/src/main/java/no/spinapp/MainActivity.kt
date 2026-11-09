@@ -5,6 +5,7 @@ import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.LaunchedEffect
@@ -54,12 +55,18 @@ class MainActivity : ComponentActivity() {
                     surface = Color(0xFF1A2027),
                 )
             ) {
-                val session by AuthManager.session.collectAsState()
-                LaunchedEffect(Unit) { AuthManager.refreshIfNeeded() }
-                if (AuthManager.isConfigured && session == null) {
-                    LoginScreen()
-                } else {
-                    AppContent()
+                // Surface gir lys tekst som standard på mørk bakgrunn
+                androidx.compose.material3.Surface(
+                    modifier = androidx.compose.ui.Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background,
+                ) {
+                    val session by AuthManager.session.collectAsState()
+                    LaunchedEffect(Unit) { AuthManager.refreshIfNeeded() }
+                    if (AuthManager.isConfigured && session == null) {
+                        LoginScreen()
+                    } else {
+                        AppContent()
+                    }
                 }
             }
         }
