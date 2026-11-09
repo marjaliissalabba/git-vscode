@@ -12,8 +12,8 @@ android {
         applicationId = "no.spinapp"
         minSdk = 26
         targetSdk = 35
-        versionCode = 2
-        versionName = "0.2"
+        versionCode = 3
+        versionName = "0.3"
 
         // Innlogging (Supabase). Settes som miljøvariabler eller i gradle.properties.
         // Tom verdi = innlogging er av, og appen kan brukes uten konto.
@@ -22,8 +22,20 @@ android {
         buildConfigField("String", "SUPABASE_ANON_KEY", "\"${cfg("SUPABASE_ANON_KEY")}\"")
     }
 
+    // Fast utviklingsnøkkel, slik at nye versjoner kan installeres over den gamle.
+    // (Bare for testversjoner. Ikke hemmelig, og ikke for Play Butikk.)
+    signingConfigs {
+        getByName("debug") {
+            storeFile = file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+
     buildTypes {
         debug {
+            signingConfig = signingConfigs.getByName("debug")
             applicationIdSuffix = ".dev"
         }
     }
