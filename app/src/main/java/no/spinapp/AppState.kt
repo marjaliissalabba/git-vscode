@@ -21,6 +21,8 @@ object AppState {
 
     fun init(context: Context) {
         prefs = context.getSharedPreferences("spinapp", Context.MODE_PRIVATE)
+        prefs.edit().remove("lastSummary").remove("authAccess").remove("authRefresh")
+            .remove("authExpires").remove("authUser").remove("authEmail").apply()
         if (!prefs.contains("planStart")) {
             prefs.edit().putLong("planStart", LocalDate.now().toEpochDay()).apply()
         }
@@ -66,32 +68,24 @@ object AppState {
             .putFloat("lcdR", r.right).putFloat("lcdB", r.bottom)
             .apply()
 
-    fun saveSession(s: no.spinapp.core.AuthSession?) {
-        val e = prefs.edit()
-        if (s == null) {
-            e.remove("authAccess").remove("authRefresh").remove("authExpires").remove("authUser")
-        } else {
-            e.putString("authAccess", s.accessToken).putString("authRefresh", s.refreshToken)
-                .putLong("authExpires", s.expiresAtEpochSec).putString("authUser", s.userId)
-                .putString("authEmail", s.email)
-        }
-        e.apply()
-    }
+    var retention: no.spinapp.core.Retention
+        get() = runCatching { no.spinapp.core.Retention.valueOf(prefs.getString("retention", null)!!) }
+            .getOrDefault(no.spinapp.core.Retention.YEAR_1)
+        set(v) = prefs.edit().putString("retention", v.name).apply()
 
-    fun loadSession(): no.spinapp.core.AuthSession? {
-        val access = prefs.getString("authAccess", null) ?: return null
-        val refresh = prefs.getString("authRefresh", null) ?: return null
-        return no.spinapp.core.AuthSession(
-            access, refresh, prefs.getLong("authExpires", 0),
-            prefs.getString("authUser", "") ?: "", prefs.getString("authEmail", "") ?: "",
-        )
-    }
+    /** Spotify-spilleliste (spotify:-URI) som åpnes til økta. */
+    var spotifyUri: String?
+        get() = prefs.getString("spotifyUri", null)
+        set(v) = prefs.edit().putString("spotifyUri", v).apply()
 
-    /** Sist brukte e-post, så den er fylt ut neste gang. */
-    val lastEmail: String?
-        get() = prefs.getString("authEmail", null)
+    /** Start/pause Spotify sammen med økta. */
+    var spotifyControl: Boolean
+        get() = prefs.getBoolean("spotifyControl", true)
+        set(v) = prefs.edit().putBoolean("spotifyControl", v).apply()
 
-    var lastSummary: String?
-        get() = prefs.getString("lastSummary", null)
-        set(v) = prefs.edit().putString("lastSummary", v).apply()
+    /** Ny sang ved hvert nytt intervall. */
+    var spotifyNextOnInterval: Boolean
+        get() = prefs.getBoolean("spotifyNextOnInterval", false)
+        set(v) = prefs.edit().putBoolean("spotifyNextOnInterval", v).apply()
+
 }

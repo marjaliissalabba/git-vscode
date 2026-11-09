@@ -26,6 +26,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -74,6 +75,12 @@ fun RideScreen(activity: MainActivity, workout: Workout, onFinished: (RideSummar
     var paused by remember { mutableStateOf(true) }
     var confirmStop by remember { mutableStateOf(false) }
     val coach = remember { Coach(context) }
+    val startedAt = remember { System.currentTimeMillis() / 1000 }
+    val spotifyOn = remember { AppState.spotifyControl && no.spinapp.SpotifyControl.isInstalled(context) }
+    var musicPlaying by remember { mutableStateOf(false) }
+    fun saveRide(summary: RideSummary) {
+        no.spinapp.HistoryStore.add(no.spinapp.core.RideRecord.from(summary, workout.id, ftp, startedAt))
+    }
     val sourceStatus by (source?.status ?: kotlinx.coroutines.flow.MutableStateFlow("Ingen datakilde")).collectAsState()
 
     DisposableEffect(Unit) {
@@ -94,6 +101,13 @@ fun RideScreen(activity: MainActivity, workout: Workout, onFinished: (RideSummar
         }
     }
 
+    // Spotify følger start/pause
+    LaunchedEffect(paused) {
+        if (!spotifyOn) return@LaunchedEffect
+        if (!paused && !musicPlaying) { no.spinapp.SpotifyControl.play(context); musicPlaying = true }
+        if (paused && musicPlaying && state.elapsedSec > 0) { no.spinapp.SpotifyControl.pause(context); musicPlaying = false }
+    }
+
     LaunchedEffect(paused) {
         if (paused) return@LaunchedEffect
         var lastIndex = state.segmentIndex
@@ -107,14 +121,15 @@ fun RideScreen(activity: MainActivity, workout: Workout, onFinished: (RideSummar
             if (state.finished) {
                 coach.say("Bra jobba! Økta er ferdig.")
                 val summary = session.summary()
-                AppState.lastSummary = "${summary.workoutName}: ${summary.durationSec / 60} min, snitt ${summary.avgPower} W, " +
-                    "NP ${summary.normalizedPower} W, ${summary.kilojoules} kJ, treff ${summary.powerCompliancePct} %"
+                saveRide(summary)
+                if (spotifyOn) no.spinapp.SpotifyControl.pause(context)
                 onFinished(summary)
                 return@LaunchedEffect
             }
             if (state.segmentIndex != lastIndex) {
                 lastIndex = state.segmentIndex
                 coach.segmentChange(state, ftp)
+                if (spotifyOn && AppState.spotifyNextOnInterval) no.spinapp.SpotifyControl.next(context)
             } else if (state.segmentRemainingSec in 1..3) {
                 coach.beep()
             }
@@ -214,7 +229,17 @@ fun RideScreen(activity: MainActivity, workout: Workout, onFinished: (RideSummar
         )
 
         WorkoutProfile(workout, ftp, state.elapsedSec, Modifier.fillMaxWidth().height(64.dp))
-        Text(sourceStatus, color = Color.Gray, fontSize = 12.sp)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(sourceStatus, color = Color.Gray, fontSize = 12.sp, modifier = Modifier.weight(1f))
+            if (spotifyOn) {
+                TextButton(onClick = { no.spinapp.SpotifyControl.previous(context) }) { Text("⏮", fontSize = 20.sp) }
+                TextButton(onClick = {
+                    if (musicPlaying) no.spinapp.SpotifyControl.pause(context) else no.spinapp.SpotifyControl.play(context)
+                    musicPlaying = !musicPlaying
+                }) { Text(if (musicPlaying) "⏸" else "▶", fontSize = 20.sp) }
+                TextButton(onClick = { no.spinapp.SpotifyControl.next(context) }) { Text("⏭", fontSize = 20.sp) }
+            }
+        }
 
         if (session.inWarmup()) {
             OutlinedButton(
@@ -240,7 +265,10 @@ fun RideScreen(activity: MainActivity, workout: Workout, onFinished: (RideSummar
                         confirmStop = true
                     } else {
                         paused = true
-                        onFinished(if (session.elapsedSec > 60) session.summary() else null)
+                        if (spotifyOn && musicPlaying) no.spinapp.SpotifyControl.pause(context)
+                        val summary = if (session.elapsedSec > 60) session.summary() else null
+                        summary?.let { saveRide(it) }
+                        onFinished(summary)
                     }
                 },
                 modifier = Modifier.weight(1f).height(56.dp),

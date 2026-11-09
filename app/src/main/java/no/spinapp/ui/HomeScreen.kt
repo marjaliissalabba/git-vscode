@@ -41,7 +41,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlinx.coroutines.launch
 import no.spinapp.AppState
 import no.spinapp.MainActivity
 import no.spinapp.core.SourceType
@@ -56,6 +55,7 @@ fun HomeScreen(
     onStartWorkout: (Workout) -> Unit,
     onBleSetup: () -> Unit,
     onCameraSetup: () -> Unit,
+    onHistory: () -> Unit,
 ) {
     var ftp by remember { mutableIntStateOf(AppState.ftp) }
     var ftpText by remember { mutableStateOf(AppState.ftp.toString()) }
@@ -74,7 +74,6 @@ fun HomeScreen(
     ) {
         Text("SpinApp", fontSize = 30.sp, fontWeight = FontWeight.Bold)
         Text("Trening etter watt og kadens, med Stages-sykkelen", color = Color.Gray)
-        AccountRow()
 
         // FTP
         Card(Modifier.fillMaxWidth()) {
@@ -185,24 +184,8 @@ fun HomeScreen(
             }
         }
 
-        AppState.lastSummary?.let {
-            Card(Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(16.dp)) {
-                    Text("Forrige økt", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
-                    Text(it, color = Color.Gray, fontSize = 14.sp)
-                }
-            }
-        }
-
-        Card(Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(16.dp)) {
-                Text("Spotify", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
-                Text(
-                    "Kommer i neste versjon: spilleliste fra favorittene dine der sangtempoet passer kadensen i økta.",
-                    color = Color.Gray, fontSize = 14.sp,
-                )
-            }
-        }
+        HistoryCard(onOpenHistory = onHistory)
+        SpotifyCard()
         Spacer(Modifier.height(24.dp))
     }
 }
@@ -266,15 +249,3 @@ fun LiveSourceView() {
     }
 }
 
-@Composable
-private fun AccountRow() {
-    if (!no.spinapp.AuthManager.isConfigured) return
-    val session by no.spinapp.AuthManager.session.collectAsState()
-    val scope = androidx.compose.runtime.rememberCoroutineScope()
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Text("Innlogget som ${session?.email ?: "–"}", color = Color.Gray, fontSize = 13.sp, modifier = Modifier.weight(1f))
-        TextButton(onClick = {
-            scope.launch { no.spinapp.AuthManager.signOut() }
-        }) { Text("Logg ut") }
-    }
-}

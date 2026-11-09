@@ -8,8 +8,6 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -25,8 +23,8 @@ import no.spinapp.sources.CameraSource
 import no.spinapp.sources.SimulatorSource
 import no.spinapp.ui.BleSetupScreen
 import no.spinapp.ui.CameraSetupScreen
+import no.spinapp.ui.HistoryScreen
 import no.spinapp.ui.HomeScreen
-import no.spinapp.ui.LoginScreen
 import no.spinapp.ui.RideScreen
 import no.spinapp.ui.SummaryScreen
 
@@ -34,6 +32,7 @@ sealed interface Screen {
     data object Home : Screen
     data object BleSetup : Screen
     data object CameraSetup : Screen
+    data object History : Screen
     data class Ride(val workout: Workout) : Screen
     data class Summary(val summary: RideSummary) : Screen
 }
@@ -43,7 +42,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         AppState.init(this)
-        AuthManager.load()
+        HistoryStore.init(this)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
         setContent {
@@ -60,13 +59,7 @@ class MainActivity : ComponentActivity() {
                     modifier = androidx.compose.ui.Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background,
                 ) {
-                    val session by AuthManager.session.collectAsState()
-                    LaunchedEffect(Unit) { AuthManager.refreshIfNeeded() }
-                    if (AuthManager.isConfigured && session == null) {
-                        LoginScreen()
-                    } else {
-                        AppContent()
-                    }
+                    AppContent()
                 }
             }
         }
@@ -83,7 +76,9 @@ class MainActivity : ComponentActivity() {
                 onStartWorkout = { screen = Screen.Ride(it) },
                 onBleSetup = { screen = Screen.BleSetup },
                 onCameraSetup = { screen = Screen.CameraSetup },
+                onHistory = { screen = Screen.History },
             )
+            Screen.History -> HistoryScreen(onDone = { screen = Screen.Home })
             Screen.BleSetup -> BleSetupScreen(onDone = { screen = Screen.Home })
             Screen.CameraSetup -> CameraSetupScreen(activity = this, onDone = { screen = Screen.Home })
             is Screen.Ride -> RideScreen(

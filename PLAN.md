@@ -15,9 +15,9 @@
 | 0. Avklaring | ✅ Stages SC-sykkel med ANT+-konsoll, Galaxy A56 (Android), uten pulsbelte foreløpig |
 | 1. Lese data | ✅ Bluetooth, ANT+, kamera og simulator i appen. Kameraleseren leser bildet av konsollet riktig. ⏳ Ikke testet på selve sykkelen |
 | 2. Teller + økt | ✅ Rund måler i % av FTP med 8 sonefarger (100 % = oransje), hvit målbue og pil, RPM under, intervalltid og neste intervall, tale og vibrasjon, hopp over oppvarming |
-| 3. FTP + treningsmotor | ✅ 7 økter inkl. FTP-test, ukeplan, oppsummering med forslag til ny FTP. ⏳ Mangler lagret historikk |
-| Innlogging | ✅ E-post + engangskode (bare e-post lagres). ⏳ Venter på Supabase-oppsett |
-| 4. Spotify | ⏳ Ikke startet |
+| 3. FTP + treningsmotor | ✅ 7 økter inkl. FTP-test, ukeplan, oppsummering med forslag til ny FTP, lokal historikk med automatisk sletting |
+| Brukerkonto | ❌ Droppet: ingen bruker. Alt lagres lokalt, og appen har ikke internettilgang |
+| 4. Spotify | ✅ Steg 1: styrer Spotify-appen (åpne liste, spill/pause med økta, ny sang per intervall). ⏳ Steg 2: sanger valgt etter tempo (krever registrering hos Spotify og BPM-kilde) |
 | 5. Tilpasning | ⏳ Ikke startet (FTP-forslag finnes, men ingen historikk ennå) |
 | 6. Polering | Delvis: tale og mørkt tema er på plass. Strava-eksport mangler |
 

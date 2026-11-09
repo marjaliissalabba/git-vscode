@@ -25,22 +25,20 @@ Prøv kildene i denne rekkefølgen: Bluetooth, så ANT+, så kamera.
 2. Hvis ikke, velg **Kamera**, trykk «Juster kamera», slå på lyset på konsollet og dra den blå rammen over LCD-glasset. Avlesningen vises nederst.
 3. Kjør **FTP-test 20 min** for å få riktig FTP. Appen foreslår ny FTP etter testen.
 
-## Innlogging (e-post + engangskode)
+## Personvern og lagring
 
-Innlogging er bare e-post og en kode på e-post. Ingen navn og ingen passord. Appen lagrer bare e-postadressen, og treningsdataene ligger på telefonen.
-Innloggingen går via [Supabase](https://supabase.com) (gratis nivå). Er den ikke satt opp, virker appen uten innlogging.
+- Ingen konto og ingen innlogging. Appen har ikke tilgang til internett.
+- Øktene lagres bare på telefonen, som en kort oppsummering (ca. 0,3 kB per økt). Ingen data per sekund.
+- Gamle økter slettes automatisk (standard: etter 1 år; kan endres til 3 eller 6 måneder). Maks 1000 økter.
+- «Historikk og lagring» på forsiden: slett enkeltøkter eller alt.
+- Sikkerhetskopi av appdata er slått av.
 
-Slik slår du den på (én gang):
-1. Opprett et gratis prosjekt på supabase.com (velg region EU, f.eks. Frankfurt).
-2. **Authentication → Sign In / Providers → Email**: la «Enable Email provider» stå på. «Confirm email» kan stå på.
-3. **Authentication → Emails → Templates → «Magic Link»**: bytt innholdet til for eksempel
-   `<h2>Din SpinApp-kode</h2><p>Koden din er: <strong>{{ .Token }}</strong></p>`
-   og gjør det samme for «Confirm signup». Da får du en sekssifret kode i stedet for en lenke.
-4. **Project Settings → API**: kopier *Project URL* og *anon public key*.
-5. I GitHub-repoet: **Settings → Secrets and variables → Actions → Variables**: lag `SUPABASE_URL` og `SUPABASE_ANON_KEY` med verdiene over.
-6. Kjør bygget på nytt (Actions → «Bygg Android-app» → Run workflow). Den nye APK-en krever innlogging.
+## Spotify
 
-Merk: Supabase sin innebygde e-posttjeneste tåler bare noen få e-poster i timen. Det holder for deg selv. For flere brukere kobler du til en egen SMTP-tjeneste (f.eks. Resend eller Brevo) under Authentication → Emails → SMTP.
+Appen styrer Spotify-appen på telefonen med vanlige medieknapper. Det krever ingen innlogging eller registrering.
+- Lim inn lenken til en spilleliste (Spotify: ⋯ → Del → Kopier lenke) og trykk «Åpne lista i Spotify».
+- Musikken starter og pauser med økta. Du kan velge ny sang ved hvert intervall.
+- ⏮ ⏯ ⏭ vises på øktskjermen.
 
 ## Utvikling
 

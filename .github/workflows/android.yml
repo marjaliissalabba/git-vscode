@@ -27,11 +27,6 @@ jobs:
         run: ./gradlew :core:test --console=plain
 
       - name: Bygg APK
-        env:
-          # Settes under Settings → Secrets and variables → Actions → Variables.
-          # Uten disse bygges appen uten innlogging.
-          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
-          SUPABASE_ANON_KEY: ${{ vars.SUPABASE_ANON_KEY }}
         run: ./gradlew :app:assembleDebug --console=plain
 
       - name: Last opp APK
