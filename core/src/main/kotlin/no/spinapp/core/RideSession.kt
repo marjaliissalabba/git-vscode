@@ -1,0 +1,201 @@
+package no.spinapp.core
+
+import kotlin.math.pow
+import kotlin.math.roundToInt
+
+enum class TargetStatus { NO_DATA, LOW, IN_RANGE, HIGH }
+
+data class RideState(
+    val elapsedSec: Int,
+    val finished: Boolean,
+    val segmentIndex: Int,
+    val segment: Segment?,
+    val nextSegment: Segment?,
+    val segmentRemainingSec: Int,
+    val totalRemainingSec: Int,
+    val targetPowerLow: Int,
+    val targetPowerHigh: Int,
+    val powerW: Int?,
+    val cadenceRpm: Int?,
+    val heartRateBpm: Int?,
+    val powerStatus: TargetStatus,
+    val cadenceStatus: TargetStatus,
+    val zone: Zone?,
+)
+
+data class RideSummary(
+    val workoutName: String,
+    val durationSec: Int,
+    val avgPower: Int,
+    val normalizedPower: Int,
+    val maxPower: Int,
+    val avgCadence: Int,
+    val kilojoules: Int,
+    val tss: Int,
+    val powerCompliancePct: Int,
+    val cadenceCompliancePct: Int,
+    val secondsInZone: Map<Zone, Int>,
+    val best20MinPower: Int?,
+    val ftpTestResult: Int?,
+    val suggestedFtp: Int?,
+)
+
+/**
+ * Følger en økt sekund for sekund og samler statistikk.
+ * [tick] kalles én gang i sekundet med siste måling.
+ */
+class RideSession(val workout: Workout, val ftp: Int) {
+    private val powerLog = ArrayList<Int>()
+    private val cadenceLog = ArrayList<Int>()
+    private val zoneSeconds = mutableMapOf<Zone, Int>()
+    private var powerHits = 0
+    private var cadenceHits = 0
+    private var ridingSeconds = 0
+    private val ftpTestPower = ArrayList<Int>()
+    var elapsedSec = 0
+        private set
+
+    fun tolerance(target: Int) = maxOf(5, (target * 0.03).roundToInt())
+
+    fun status(value: Int?, low: Int, high: Int, tol: Int): TargetStatus = when {
+        value == null -> TargetStatus.NO_DATA
+        value < low - tol -> TargetStatus.LOW
+        value > high + tol -> TargetStatus.HIGH
+        else -> TargetStatus.IN_RANGE
+    }
+
+    fun state(sample: BikeSample?): RideState {
+        val loc = workout.locate(elapsedSec)
+        val seg = loc?.let { workout.segments[it.first] }
+        val idx = loc?.first ?: workout.segments.size
+        val segRemaining = if (loc != null && seg != null) seg.durationSec - loc.second else 0
+        val pLow = seg?.powerLow(ftp) ?: 0
+        val pHigh = seg?.powerHigh(ftp) ?: 0
+        val power = sample?.powerW
+        val cad = sample?.cadenceRpm
+        return RideState(
+            elapsedSec = elapsedSec,
+            finished = loc == null,
+            segmentIndex = idx,
+            segment = seg,
+            nextSegment = workout.segments.getOrNull(idx + 1),
+            segmentRemainingSec = segRemaining,
+            totalRemainingSec = (workout.durationSec - elapsedSec).coerceAtLeast(0),
+            targetPowerLow = pLow,
+            targetPowerHigh = pHigh,
+            powerW = power,
+            cadenceRpm = cad,
+            heartRateBpm = sample?.heartRateBpm,
+            powerStatus = if (seg == null) TargetStatus.NO_DATA else status(power, pLow, pHigh, tolerance(pLow)),
+            cadenceStatus = if (seg == null) TargetStatus.NO_DATA else status(cad, seg.cadenceLow, seg.cadenceHigh, 3),
+            zone = power?.let { Zone.forPower(it, ftp) },
+        )
+    }
+
+    /** Registrer ett sekund. Returnerer tilstanden etter sekundet. */
+    fun tick(sample: BikeSample?): RideState {
+        val before = state(sample)
+        if (before.finished) return before
+        val seg = before.segment!!
+        val p = sample?.powerW ?: 0
+        val c = sample?.cadenceRpm ?: 0
+        powerLog += p
+        cadenceLog += c
+        if (p > 0 || c > 0) {
+            ridingSeconds++
+            val z = Zone.forPower(p, ftp)
+            zoneSeconds[z] = (zoneSeconds[z] ?: 0) + 1
+            if (before.powerStatus == TargetStatus.IN_RANGE) powerHits++
+            if (before.cadenceStatus == TargetStatus.IN_RANGE) cadenceHits++
+        }
+        if (seg.isFtpTest) ftpTestPower += p
+        elapsedSec++
+        return state(sample)
+    }
+
+    fun summary(): RideSummary {
+        val n = powerLog.size
+        val avgP = if (n == 0) 0 else powerLog.average().roundToInt()
+        val riding = cadenceLog.filter { it > 0 }
+        val avgC = if (riding.isEmpty()) 0 else riding.average().roundToInt()
+        val np = normalizedPower(powerLog)
+        val ifac = if (ftp > 0) np.toDouble() / ftp else 0.0
+        val tss = (n * np * ifac / (ftp * 3600.0) * 100).roundToInt()
+        val best20 = bestAverage(powerLog, 20 * 60)
+        val ftpTest = if (ftpTestPower.size >= 18 * 60) (ftpTestPower.average() * 0.95).roundToInt() else null
+        val fromBest20 = best20?.let { (it * 0.95).roundToInt() }
+        val suggested = when {
+            ftpTest != null -> ftpTest
+            fromBest20 != null && fromBest20 > ftp -> fromBest20
+            else -> null
+        }
+        return RideSummary(
+            workoutName = workout.name,
+            durationSec = n,
+            avgPower = avgP,
+            normalizedPower = np,
+            maxPower = powerLog.maxOrNull() ?: 0,
+            avgCadence = avgC,
+            kilojoules = (powerLog.sumOf { it.toLong() } / 1000.0).roundToInt(),
+            tss = tss,
+            powerCompliancePct = if (ridingSeconds == 0) 0 else powerHits * 100 / ridingSeconds,
+            cadenceCompliancePct = if (ridingSeconds == 0) 0 else cadenceHits * 100 / ridingSeconds,
+            secondsInZone = Zone.entries.associateWith { zoneSeconds[it] ?: 0 },
+            best20MinPower = best20,
+            ftpTestResult = ftpTest,
+            suggestedFtp = suggested,
+        )
+    }
+
+    companion object {
+        fun normalizedPower(p: List<Int>): Int {
+            if (p.size < 30) return if (p.isEmpty()) 0 else p.average().roundToInt()
+            var sum = 0.0
+            var window = 0.0
+            var count = 0
+            for (i in p.indices) {
+                window += p[i]
+                if (i >= 30) window -= p[i - 30]
+                if (i >= 29) {
+                    sum += (window / 30.0).pow(4)
+                    count++
+                }
+            }
+            return (sum / count).pow(0.25).roundToInt()
+        }
+
+        fun bestAverage(p: List<Int>, seconds: Int): Int? {
+            if (p.size < seconds) return null
+            var window = p.take(seconds).sumOf { it.toLong() }
+            var best = window
+            for (i in seconds until p.size) {
+                window += p[i] - p[i - seconds]
+                if (window > best) best = window
+            }
+            return (best.toDouble() / seconds).roundToInt()
+        }
+    }
+}
+
+/**
+ * Simulert rytter for testing uten sykkel: følger målet med litt støy og treghet.
+ */
+class SimulatedRider(seed: Long = 42) {
+    private val rnd = java.util.Random(seed)
+    private var power = 80.0
+    private var cadence = 70.0
+
+    fun next(target: Segment?, ftp: Int, nowMs: Long): BikeSample {
+        val tp = target?.let { (it.powerLow(ftp) + it.powerHigh(ftp)) / 2.0 } ?: (ftp * 0.5)
+        val tc = target?.midCadence?.toDouble() ?: 85.0
+        power += (tp - power) * 0.25 + rnd.nextGaussian() * 6
+        cadence += (tc - cadence) * 0.3 + rnd.nextGaussian() * 1.5
+        return BikeSample(
+            timestampMs = nowMs,
+            powerW = power.roundToInt().coerceAtLeast(0),
+            cadenceRpm = cadence.roundToInt().coerceAtLeast(0),
+            speedKmh = cadence * 0.37,
+            source = SourceType.SIMULATOR,
+        )
+    }
+}
