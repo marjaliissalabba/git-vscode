@@ -145,7 +145,17 @@ fun HistoryScreen(onDone: () -> Unit) {
 @Composable
 fun SpotifyCard() {
     val context = LocalContext.current
-    val activity = context as? android.app.Activity
+    var access by remember { mutableStateOf(no.spinapp.SpotifySession.hasAccess(context)) }
+    var testResult by remember { mutableStateOf<String?>(null) }
+    // Sjekk tilgangen på nytt når brukeren kommer tilbake fra innstillingene
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
+        val obs = androidx.lifecycle.LifecycleEventObserver { _, e ->
+            if (e == androidx.lifecycle.Lifecycle.Event.ON_RESUME) access = no.spinapp.SpotifySession.hasAccess(context)
+        }
+        lifecycleOwner.lifecycle.addObserver(obs)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(obs) }
+    }
     val installed = remember { SpotifyControl.isInstalled(context) }
     var control by remember { mutableStateOf(AppState.spotifyControl) }
     var tempoLists by remember { mutableStateOf(AppState.spotifyTempoLists) }
@@ -162,6 +172,21 @@ fun SpotifyCard() {
             if (!installed) {
                 Text("Spotify-appen er ikke installert på telefonen.", color = Color.Gray, fontSize = 14.sp)
                 return@Column
+            }
+            if (!access) {
+                Text(
+                    "For at appen skal kunne velge liste og slå på shuffle, trenger den «Tilgang til varsler». " +
+                        "Det er Androids navn på tillatelsen til å styre musikkapper. SpinApp leser ingen varsler.",
+                    color = Color.LightGray, fontSize = 13.sp,
+                )
+                Button(onClick = { no.spinapp.SpotifySession.openAccessSettings(context) }) { Text("Gi tilgang") }
+                Text(
+                    "Er bryteren grå («Begrenset innstilling»)? Gå til Innstillinger → Apper → SpinApp → ⋮ øverst til høyre → " +
+                        "«Tillat begrensede innstillinger», og prøv igjen.",
+                    color = Color.Gray, fontSize = 12.sp,
+                )
+            } else {
+                Text("✓ SpinApp kan styre Spotify", color = StatusGood, fontSize = 13.sp)
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("Start og pause musikken med økta", Modifier.weight(1f))
@@ -183,18 +208,22 @@ fun SpotifyCard() {
                         OutlinedTextField(
                             value = names[band] ?: band.defaultName,
                             onValueChange = { names[band] = it; AppState.setPlaylistName(band, it) },
-                            label = { Text("${band.label} (${band.rpm})") },
+                            label = { Text("${band.label} (${band.rpm}): navn eller lenke") },
                             singleLine = true,
                             modifier = Modifier.weight(1f),
                         )
                         TextButton(onClick = {
-                            activity?.let { SpotifyControl.playPlaylist(it, AppState.playlistName(band)) }
+                            val r = SpotifyControl.playPlaylist(context, AppState.playlistName(band))
+                            testResult = no.spinapp.SpotifySession.describe(r, "Spiller ${AppState.playlistName(band)} (shuffle på)")
                         }) { Text("Test") }
                     }
                 }
+                testResult?.let {
+                    Text(it, color = if (it.startsWith("✓")) StatusGood else Color(0xFFE74C3C), fontSize = 13.sp)
+                }
                 Text(
-                    "Navnene må være like som i Spotify. Trykk «Test»: riktig liste skal begynne å spille, og du skal havne her igjen. " +
-                        "Slå gjerne på tilfeldig rekkefølge (shuffle) i Spotify.",
+                    "Skriv navnet nøyaktig som i Spotify, eller lim inn lenken til lista (⋯ → Del → Kopier lenke). Lenke er sikrest. " +
+                        "Spotify må ha vært åpnet og spilt litt først.",
                     color = Color.Gray, fontSize = 12.sp,
                 )
             }

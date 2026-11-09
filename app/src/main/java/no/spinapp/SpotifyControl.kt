@@ -35,28 +35,15 @@ object SpotifyControl {
         return runCatching { context.startActivity(intent) }.isSuccess
     }
 
-    /**
-     * Spiller en av dine spillelister ved navn (samme mekanisme som talestyring bruker).
-     * Spotify kan kort legge seg foran, så øktskjermen hentes tilbake med en gang.
-     */
-    fun playPlaylist(activity: android.app.Activity, playlistName: String): Boolean {
-        val search = Intent(android.provider.MediaStore.INTENT_ACTION_MEDIA_PLAY_FROM_SEARCH).apply {
-            setPackage(PACKAGE)
-            putExtra(android.app.SearchManager.QUERY, playlistName)
-            putExtra(android.provider.MediaStore.EXTRA_MEDIA_FOCUS, "vnd.android.cursor.item/playlist")
-            putExtra(android.provider.MediaStore.EXTRA_MEDIA_PLAYLIST, playlistName)
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        }
-        val back = Intent(activity, activity.javaClass).apply {
-            addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-        }
-        return runCatching { activity.startActivities(arrayOf(search, back)) }.isSuccess
-    }
+    /** Spiller en spilleliste (navn eller lenke) og slår på shuffle. */
+    fun playPlaylist(context: Context, nameOrLink: String): SpotifySession.Result =
+        SpotifySession.playPlaylist(context, nameOrLink)
 
-    fun play(context: Context) = key(context, KeyEvent.KEYCODE_MEDIA_PLAY)
-    fun pause(context: Context) = key(context, KeyEvent.KEYCODE_MEDIA_PAUSE)
-    fun next(context: Context) = key(context, KeyEvent.KEYCODE_MEDIA_NEXT)
-    fun previous(context: Context) = key(context, KeyEvent.KEYCODE_MEDIA_PREVIOUS)
+    // Bruker Spotifys avspillingskontroll når tilgang er gitt, ellers vanlige medieknapper.
+    fun play(context: Context) { if (SpotifySession.play(context) != SpotifySession.Result.Ok) key(context, KeyEvent.KEYCODE_MEDIA_PLAY) }
+    fun pause(context: Context) { if (SpotifySession.pause(context) != SpotifySession.Result.Ok) key(context, KeyEvent.KEYCODE_MEDIA_PAUSE) }
+    fun next(context: Context) { if (SpotifySession.next(context) != SpotifySession.Result.Ok) key(context, KeyEvent.KEYCODE_MEDIA_NEXT) }
+    fun previous(context: Context) { if (SpotifySession.previous(context) != SpotifySession.Result.Ok) key(context, KeyEvent.KEYCODE_MEDIA_PREVIOUS) }
 
     private fun key(context: Context, code: Int) {
         val am = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager

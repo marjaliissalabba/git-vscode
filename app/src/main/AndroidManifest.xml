@@ -46,5 +46,15 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <!-- Kreves for å styre Spotify via avspillingskontrollen. Leser ingen varsler. -->
+        <service
+            android:name=".SpotifyAccessService"
+            android:exported="false"
+            android:label="SpinApp – styre Spotify"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
     </application>
 </manifest>

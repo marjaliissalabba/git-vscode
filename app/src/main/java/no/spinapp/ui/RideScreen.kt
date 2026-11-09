@@ -88,7 +88,7 @@ fun RideScreen(activity: MainActivity, workout: Workout, onFinished: (RideSummar
     val tempoLists = remember { spotifyOn && AppState.spotifyTempoLists }
     var playingBand by remember { mutableStateOf<no.spinapp.core.CadenceBand?>(null) }
     fun switchList(band: no.spinapp.core.CadenceBand) {
-        no.spinapp.SpotifyControl.playPlaylist(activity, AppState.playlistName(band))
+        no.spinapp.SpotifyControl.playPlaylist(context, AppState.playlistName(band))
         playingBand = band
         lastSkipAt = session.elapsedSec
     }
