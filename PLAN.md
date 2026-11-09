@@ -8,6 +8,24 @@
 
 ---
 
+## Funn etter bilder av sykkelen (9. nov 2026)
+
+- **Sykkel:** Stages Cycling innendørssykkel (SC-serien) med Stages-konsoll. Konsollet har «LINK HERE – ANT+»-merke.
+- **Telefon:** Android. **Pulsbelte:** ikke ennå (kommer senere, velg et med både Bluetooth og ANT+).
+- **Konsollet viser ekte watt** (fra kraftmåleren i kranken). Vi trenger altså **ikke** estimere watt fra motstand.
+- **Felter på displayet** (venstre = nå, høyre = snitt): kJ (punktmatrise øverst), WATTS, RPM, SPEED (km/t), KCAL og KCAL/HR, TIME (t:mm:ss), DIST (km).
+  Alt unntatt kJ er 7-segment-tall. Oppsettet er fast, så vi kan ha en **ferdig mal for Stages-konsollet** og slipper å markere feltene for hånd. Du justerer bare plasseringen.
+- **Motstandsnivå vises ikke** (rattet er analogt). Programmet styres derfor på watt og RPM, ikke på motstand.
+- **Kameraforhold:** Uten bakgrunnslys er displayet grått med lav kontrast og gjenskinn (bilde 2). Med lyset på (lyspære-knappen) er det skarpt og lett å lese (bilde 1). **Bakgrunnslyset må stå på**, og telefonen må stå rett over displayet, ikke på skrå.
+
+### Ny førsteprioritet: dataene trådløst
+Konsollet sender **ANT+** (strøm og kadens), og kraftmåleren kan også sende Bluetooth. Det er langt mer presist enn kamera:
+1. Sjekk om telefonen støtter ANT+: installer «ANT Radio Service» og «ANT+ Plugin Sampler»/«ANT Tester» fra Play Butikk. Mange eldre Samsung-telefoner har ANT+ innebygd, nyere ofte ikke. Ellers fungerer en **USB ANT+-pinne med USB-C-adapter** (ca. 300 kr).
+2. Sjekk Bluetooth: installer **nRF Connect**, tråkk på sykkelen og se om det dukker opp en enhet som heter «Stages …» med *Cycling Power*-tjeneste.
+3. Fungerer én av disse, bruker appen den som hovedkilde. **Kameralesingen blir da reserve** (eller kan droppes), og fase 1 blir mye kortere.
+
+---
+
 ## 0. Avklaringer før vi starter (viktig)
 
 | Spørsmål | Hvorfor det betyr noe |
