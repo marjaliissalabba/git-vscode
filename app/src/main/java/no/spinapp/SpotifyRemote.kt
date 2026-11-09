@@ -95,7 +95,7 @@ object SpotifyRemote {
         }
     }
 
-    private suspend fun <T> CallResult<T>.await(): Boolean =
+    private suspend fun <T> CallResult<T>.awaitOk(): Boolean =
         withTimeoutOrNull(8000) {
             suspendCancellableCoroutine<Boolean> { cont ->
                 setResultCallback { if (cont.isActive) cont.resume(true) }
@@ -107,15 +107,15 @@ object SpotifyRemote {
     suspend fun playPlaylist(context: Context, uri: String): Boolean {
         if (!connect(context)) return false
         val api = remote?.playerApi ?: return false
-        api.setShuffle(true).await()
-        val ok = api.play(uri).await()
+        api.setShuffle(true).awaitOk()
+        val ok = api.play(uri).awaitOk()
         // Noen ganger må shuffle settes etter at lista har startet
-        api.setShuffle(true).await()
+        api.setShuffle(true).awaitOk()
         return ok
     }
 
-    suspend fun next(context: Context): Boolean = connect(context) && (remote?.playerApi?.skipNext()?.await() ?: false)
-    suspend fun previous(context: Context): Boolean = connect(context) && (remote?.playerApi?.skipPrevious()?.await() ?: false)
-    suspend fun pause(context: Context): Boolean = connect(context) && (remote?.playerApi?.pause()?.await() ?: false)
-    suspend fun resume(context: Context): Boolean = connect(context) && (remote?.playerApi?.resume()?.await() ?: false)
+    suspend fun next(context: Context): Boolean = connect(context) && (remote?.playerApi?.skipNext()?.awaitOk() ?: false)
+    suspend fun previous(context: Context): Boolean = connect(context) && (remote?.playerApi?.skipPrevious()?.awaitOk() ?: false)
+    suspend fun pause(context: Context): Boolean = connect(context) && (remote?.playerApi?.pause()?.awaitOk() ?: false)
+    suspend fun resume(context: Context): Boolean = connect(context) && (remote?.playerApi?.resume()?.awaitOk() ?: false)
 }
