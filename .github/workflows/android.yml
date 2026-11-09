@@ -3,6 +3,8 @@ name: Bygg Android-app
 on:
   push:
     branches: ["**"]
+    paths-ignore:
+      - "**.md"
   workflow_dispatch:
 
 permissions:
