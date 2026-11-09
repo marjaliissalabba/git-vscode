@@ -66,6 +66,31 @@ object AppState {
             .putFloat("lcdR", r.right).putFloat("lcdB", r.bottom)
             .apply()
 
+    fun saveSession(s: no.spinapp.core.AuthSession?) {
+        val e = prefs.edit()
+        if (s == null) {
+            e.remove("authAccess").remove("authRefresh").remove("authExpires").remove("authUser")
+        } else {
+            e.putString("authAccess", s.accessToken).putString("authRefresh", s.refreshToken)
+                .putLong("authExpires", s.expiresAtEpochSec).putString("authUser", s.userId)
+                .putString("authEmail", s.email)
+        }
+        e.apply()
+    }
+
+    fun loadSession(): no.spinapp.core.AuthSession? {
+        val access = prefs.getString("authAccess", null) ?: return null
+        val refresh = prefs.getString("authRefresh", null) ?: return null
+        return no.spinapp.core.AuthSession(
+            access, refresh, prefs.getLong("authExpires", 0),
+            prefs.getString("authUser", "") ?: "", prefs.getString("authEmail", "") ?: "",
+        )
+    }
+
+    /** Sist brukte e-post, så den er fylt ut neste gang. */
+    val lastEmail: String?
+        get() = prefs.getString("authEmail", null)
+
     var lastSummary: String?
         get() = prefs.getString("lastSummary", null)
         set(v) = prefs.edit().putString("lastSummary", v).apply()

@@ -41,6 +41,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.launch
 import no.spinapp.AppState
 import no.spinapp.MainActivity
 import no.spinapp.core.SourceType
@@ -73,6 +74,7 @@ fun HomeScreen(
     ) {
         Text("SpinApp", fontSize = 30.sp, fontWeight = FontWeight.Bold)
         Text("Trening etter watt og kadens, med Stages-sykkelen", color = Color.Gray)
+        AccountRow()
 
         // FTP
         Card(Modifier.fillMaxWidth()) {
@@ -261,5 +263,18 @@ fun LiveSourceView() {
             Text("${sample?.powerW ?: "–"} W", fontSize = 28.sp, fontWeight = FontWeight.Bold)
             Text("${sample?.cadenceRpm ?: "–"} rpm", fontSize = 28.sp, fontWeight = FontWeight.Bold)
         }
+    }
+}
+
+@Composable
+private fun AccountRow() {
+    if (!no.spinapp.AuthManager.isConfigured) return
+    val session by no.spinapp.AuthManager.session.collectAsState()
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text("Innlogget som ${session?.email ?: "–"}", color = Color.Gray, fontSize = 13.sp, modifier = Modifier.weight(1f))
+        TextButton(onClick = {
+            scope.launch { no.spinapp.AuthManager.signOut() }
+        }) { Text("Logg ut") }
     }
 }

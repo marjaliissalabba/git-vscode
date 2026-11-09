@@ -12,8 +12,14 @@ android {
         applicationId = "no.spinapp"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1"
+        versionCode = 2
+        versionName = "0.2"
+
+        // Innlogging (Supabase). Settes som miljøvariabler eller i gradle.properties.
+        // Tom verdi = innlogging er av, og appen kan brukes uten konto.
+        fun cfg(name: String) = (System.getenv(name) ?: (project.findProperty(name) as String?) ?: "").trim()
+        buildConfigField("String", "SUPABASE_URL", "\"${cfg("SUPABASE_URL")}\"")
+        buildConfigField("String", "SUPABASE_ANON_KEY", "\"${cfg("SUPABASE_ANON_KEY")}\"")
     }
 
     buildTypes {
@@ -33,6 +39,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
