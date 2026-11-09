@@ -60,23 +60,70 @@ object SpotifySession {
         }
     }
 
+    data class PlayOutcome(val ok: Boolean, val message: String)
+
+    private val PREFS = "spotify_session"
+
+    private fun current(c: MediaControllerCompat): String? =
+        c.metadata?.getString(android.support.v4.media.MediaMetadataCompat.METADATA_KEY_TITLE)
+
+    private fun supportsText(c: MediaControllerCompat): String {
+        val a = c.playbackState?.actions ?: return "ukjent"
+        val names = buildList {
+            if (a and PlaybackStateCompat.ACTION_PLAY_FROM_URI != 0L) add("lenke")
+            if (a and PlaybackStateCompat.ACTION_PLAY_FROM_MEDIA_ID != 0L) add("liste-ID")
+            if (a and PlaybackStateCompat.ACTION_PLAY_FROM_SEARCH != 0L) add("søk")
+        }
+        return if (names.isEmpty()) "ingen" else names.joinToString(", ")
+    }
+
     /**
-     * Spiller en spilleliste. [nameOrLink] kan være navnet på lista (søkes opp i Spotify)
-     * eller en delingslenke/spotify:-URI (spilles direkte). Slår på shuffle.
+     * Spiller en spilleliste og sjekker at Spotify faktisk byttet sang.
+     * [nameOrLink] er en lenke/spotify:-URI (sikrest) eller navnet på lista.
+     * Prøver flere måter og husker den som virket.
      */
-    fun playPlaylist(context: Context, nameOrLink: String): Result = withController(context) { c ->
+    suspend fun playPlaylist(context: Context, nameOrLink: String): PlayOutcome {
+        if (!hasAccess(context)) return PlayOutcome(false, describe(Result.NoAccess, ""))
+        val c = controller(context) ?: return PlayOutcome(false, describe(Result.SpotifyNotRunning, ""))
         val t = c.transportControls
-        runCatching { t.setShuffleMode(PlaybackStateCompat.SHUFFLE_MODE_ALL) }
         val uri = SpotifyControl.normalizeLink(nameOrLink)
+
+        val methods = mutableListOf<Pair<String, () -> Unit>>()
         if (uri != null) {
-            t.playFromUri(android.net.Uri.parse(uri), null)
-        } else {
+            methods += "uri" to { t.playFromUri(android.net.Uri.parse(uri), null) }
+            methods += "mediaId" to { t.playFromMediaId(uri, null) }
+        }
+        methods += "search" to {
             val extras = Bundle().apply {
                 putString(MediaStore.EXTRA_MEDIA_FOCUS, "vnd.android.cursor.item/playlist")
                 putString(MediaStore.EXTRA_MEDIA_PLAYLIST, nameOrLink)
             }
             t.playFromSearch(nameOrLink, extras)
         }
+        // Prøv den som virket sist først
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val remembered = prefs.getString("method", null)
+        methods.sortBy { if (it.first == remembered) 0 else 1 }
+
+        for ((name, send) in methods) {
+            val before = current(c)
+            runCatching { t.setShuffleMode(PlaybackStateCompat.SHUFFLE_MODE_ALL) }
+            if (runCatching { send() }.isFailure) continue
+            // Vent opptil 3 sekunder på at sangen bytter
+            repeat(10) {
+                kotlinx.coroutines.delay(300)
+                val now = current(c)
+                if (now != null && now != before) {
+                    prefs.edit().putString("method", name).apply()
+                    return PlayOutcome(true, "✓ Spotify byttet til lista: $now")
+                }
+            }
+        }
+        val hint = if (uri == null) " Lim inn lenken til lista i stedet for navnet (⋯ → Del → Kopier lenke)." else ""
+        return PlayOutcome(
+            false,
+            "Spotify reagerte ikke (Spotify støtter: ${supportsText(c)}).$hint",
+        )
     }
 
     fun play(context: Context) = withController(context) { it.transportControls.play() }

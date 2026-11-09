@@ -36,7 +36,7 @@ object SpotifyControl {
     }
 
     /** Spiller en spilleliste (navn eller lenke) og slår på shuffle. */
-    fun playPlaylist(context: Context, nameOrLink: String): SpotifySession.Result =
+    suspend fun playPlaylist(context: Context, nameOrLink: String): SpotifySession.PlayOutcome =
         SpotifySession.playPlaylist(context, nameOrLink)
 
     // Bruker Spotifys avspillingskontroll når tilgang er gitt, ellers vanlige medieknapper.

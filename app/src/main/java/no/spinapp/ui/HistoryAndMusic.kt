@@ -35,6 +35,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.launch
 import no.spinapp.AppState
 import no.spinapp.HistoryStore
 import no.spinapp.SpotifyControl
@@ -147,6 +148,7 @@ fun SpotifyCard() {
     val context = LocalContext.current
     var access by remember { mutableStateOf(no.spinapp.SpotifySession.hasAccess(context)) }
     var testResult by remember { mutableStateOf<String?>(null) }
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
     // Sjekk tilgangen på nytt når brukeren kommer tilbake fra innstillingene
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
@@ -213,8 +215,10 @@ fun SpotifyCard() {
                             modifier = Modifier.weight(1f),
                         )
                         TextButton(onClick = {
-                            val r = SpotifyControl.playPlaylist(context, AppState.playlistName(band))
-                            testResult = no.spinapp.SpotifySession.describe(r, "Spiller ${AppState.playlistName(band)} (shuffle på)")
+                            testResult = "Prøver ${AppState.playlistName(band)} …"
+                            scope.launch {
+                                testResult = SpotifyControl.playPlaylist(context, AppState.playlistName(band)).message
+                            }
                         }) { Text("Test") }
                     }
                 }
@@ -222,7 +226,7 @@ fun SpotifyCard() {
                     Text(it, color = if (it.startsWith("✓")) StatusGood else Color(0xFFE74C3C), fontSize = 13.sp)
                 }
                 Text(
-                    "Skriv navnet nøyaktig som i Spotify, eller lim inn lenken til lista (⋯ → Del → Kopier lenke). Lenke er sikrest. " +
+                    "Lim inn lenken til lista (i Spotify: ⋯ → Del → Kopier lenke). Navn virker ofte ikke. " +
                         "Spotify må ha vært åpnet og spilt litt først.",
                     color = Color.Gray, fontSize = 12.sp,
                 )

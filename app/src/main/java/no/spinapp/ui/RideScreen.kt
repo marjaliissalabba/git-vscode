@@ -46,6 +46,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import no.spinapp.AppState
 import no.spinapp.MainActivity
 import no.spinapp.core.RideSession
@@ -86,9 +87,10 @@ fun RideScreen(activity: MainActivity, workout: Workout, onFinished: (RideSummar
     }
     // Tempo-lister: hvilken liste (Tung/Middels/Rask) som spiller nå
     val tempoLists = remember { spotifyOn && AppState.spotifyTempoLists }
+    val musicScope = androidx.compose.runtime.rememberCoroutineScope()
     var playingBand by remember { mutableStateOf<no.spinapp.core.CadenceBand?>(null) }
     fun switchList(band: no.spinapp.core.CadenceBand) {
-        no.spinapp.SpotifyControl.playPlaylist(context, AppState.playlistName(band))
+        musicScope.launch { no.spinapp.SpotifyControl.playPlaylist(context, AppState.playlistName(band)) }
         playingBand = band
         lastSkipAt = session.elapsedSec
     }
