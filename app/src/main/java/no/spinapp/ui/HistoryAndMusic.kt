@@ -148,6 +148,9 @@ fun SpotifyCard() {
     val context = LocalContext.current
     var access by remember { mutableStateOf(no.spinapp.SpotifySession.hasAccess(context)) }
     var testResult by remember { mutableStateOf<String?>(null) }
+    var clientId by remember { mutableStateOf(AppState.spotifyClientId) }
+    val remoteStatus by no.spinapp.SpotifyRemote.status.collectAsState()
+    val nowPlaying by no.spinapp.SpotifyRemote.nowPlaying.collectAsState()
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     // Sjekk tilgangen på nytt når brukeren kommer tilbake fra innstillingene
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
@@ -175,7 +178,35 @@ fun SpotifyCard() {
                 Text("Spotify-appen er ikke installert på telefonen.", color = Color.Gray, fontSize = 14.sp)
                 return@Column
             }
-            if (!access) {
+            // Registrert Spotify-app (App Remote)
+            Text("Kobling til Spotify", fontWeight = FontWeight.SemiBold)
+            OutlinedTextField(
+                value = clientId,
+                onValueChange = { clientId = it.trim(); AppState.spotifyClientId = clientId; no.spinapp.SpotifyRemote.disconnect() },
+                label = { Text("Client ID fra developer.spotify.com") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            if (clientId.isNotBlank()) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Button(onClick = { scope.launch { no.spinapp.SpotifyRemote.connect(context) } }) { Text("Koble til") }
+                    Text(
+                        remoteStatus, Modifier.padding(start = 10.dp).weight(1f), fontSize = 13.sp,
+                        color = if (remoteStatus.startsWith("✓")) StatusGood else Color.LightGray,
+                    )
+                }
+                nowPlaying?.let { Text("Spiller nå: $it", color = Color.Gray, fontSize = 12.sp) }
+            }
+            androidx.compose.foundation.text.selection.SelectionContainer {
+                Text(
+                    "Verdier til Spotify-dashbordet:\n" +
+                        "Android package: ${context.packageName}\n" +
+                        "SHA1: B8:7E:D7:94:9A:61:AA:ED:9D:46:7D:32:21:72:61:13:6A:FD:9E:F9\n" +
+                        "Redirect URI: ${no.spinapp.SpotifyRemote.REDIRECT_URI}",
+                    color = Color.Gray, fontSize = 12.sp,
+                )
+            }
+            if (!access && clientId.isBlank()) {
                 Text(
                     "For at appen skal kunne velge liste og slå på shuffle, trenger den «Tilgang til varsler». " +
                         "Det er Androids navn på tillatelsen til å styre musikkapper. SpinApp leser ingen varsler.",
@@ -187,7 +218,7 @@ fun SpotifyCard() {
                         "«Tillat begrensede innstillinger», og prøv igjen.",
                     color = Color.Gray, fontSize = 12.sp,
                 )
-            } else {
+            } else if (clientId.isBlank()) {
                 Text("✓ SpinApp kan styre Spotify", color = StatusGood, fontSize = 13.sp)
             }
             Row(verticalAlignment = Alignment.CenterVertically) {

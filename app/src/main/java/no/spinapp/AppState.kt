@@ -83,6 +83,11 @@ object AppState {
         get() = prefs.getBoolean("spotifyControl", true)
         set(v) = prefs.edit().putBoolean("spotifyControl", v).apply()
 
+    /** Client ID fra appen du registrerte på developer.spotify.com (ikke hemmelig). */
+    var spotifyClientId: String
+        get() = prefs.getString("spotifyClientId", "") ?: ""
+        set(v) = prefs.edit().putString("spotifyClientId", v.trim()).apply()
+
     /** Bytt mellom tempo-listene (Spin Tung / Middels / Rask) ut fra kadensen. */
     var spotifyTempoLists: Boolean
         get() = prefs.getBoolean("spotifyTempoLists", true)

@@ -6,6 +6,7 @@ import android.media.AudioManager
 import android.net.Uri
 import android.os.SystemClock
 import android.view.KeyEvent
+import kotlinx.coroutines.launch
 
 /**
  * Styrer Spotify-appen på telefonen uten innlogging eller registrering:
@@ -35,15 +36,44 @@ object SpotifyControl {
         return runCatching { context.startActivity(intent) }.isSuccess
     }
 
-    /** Spiller en spilleliste (navn eller lenke) og slår på shuffle. */
-    suspend fun playPlaylist(context: Context, nameOrLink: String): SpotifySession.PlayOutcome =
-        SpotifySession.playPlaylist(context, nameOrLink)
+    private val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Main)
 
-    // Bruker Spotifys avspillingskontroll når tilgang er gitt, ellers vanlige medieknapper.
-    fun play(context: Context) { if (SpotifySession.play(context) != SpotifySession.Result.Ok) key(context, KeyEvent.KEYCODE_MEDIA_PLAY) }
-    fun pause(context: Context) { if (SpotifySession.pause(context) != SpotifySession.Result.Ok) key(context, KeyEvent.KEYCODE_MEDIA_PAUSE) }
-    fun next(context: Context) { if (SpotifySession.next(context) != SpotifySession.Result.Ok) key(context, KeyEvent.KEYCODE_MEDIA_NEXT) }
-    fun previous(context: Context) { if (SpotifySession.previous(context) != SpotifySession.Result.Ok) key(context, KeyEvent.KEYCODE_MEDIA_PREVIOUS) }
+    /**
+     * Spiller en spilleliste og slår på shuffle.
+     * Med registrert Spotify-app (Client ID) brukes Spotifys App Remote, som krever lenke til lista.
+     * Uten brukes avspillingskontrollen (virker ofte ikke for å bytte liste).
+     */
+    suspend fun playPlaylist(context: Context, nameOrLink: String): SpotifySession.PlayOutcome {
+        if (SpotifyRemote.isConfigured) {
+            val uri = normalizeLink(nameOrLink)
+                ?: return SpotifySession.PlayOutcome(false, "Lim inn lenken til lista (⋯ → Del → Kopier lenke), ikke navnet.")
+            val ok = SpotifyRemote.playPlaylist(context, uri)
+            return if (ok) {
+                kotlinx.coroutines.delay(1500)
+                SpotifySession.PlayOutcome(true, "✓ Spiller lista (shuffle på)" + (SpotifyRemote.nowPlaying.value?.let { ": $it" } ?: ""))
+            } else {
+                SpotifySession.PlayOutcome(false, SpotifyRemote.status.value)
+            }
+        }
+        return SpotifySession.playPlaylist(context, nameOrLink)
+    }
+
+    private fun remoteOr(context: Context, remote: suspend () -> Boolean, fallback: () -> Unit) {
+        if (SpotifyRemote.isConfigured) scope.launch { if (!remote()) fallback() } else fallback()
+    }
+
+    fun play(context: Context) = remoteOr(context, { SpotifyRemote.resume(context) }) {
+        if (SpotifySession.play(context) != SpotifySession.Result.Ok) key(context, KeyEvent.KEYCODE_MEDIA_PLAY)
+    }
+    fun pause(context: Context) = remoteOr(context, { SpotifyRemote.pause(context) }) {
+        if (SpotifySession.pause(context) != SpotifySession.Result.Ok) key(context, KeyEvent.KEYCODE_MEDIA_PAUSE)
+    }
+    fun next(context: Context) = remoteOr(context, { SpotifyRemote.next(context) }) {
+        if (SpotifySession.next(context) != SpotifySession.Result.Ok) key(context, KeyEvent.KEYCODE_MEDIA_NEXT)
+    }
+    fun previous(context: Context) = remoteOr(context, { SpotifyRemote.previous(context) }) {
+        if (SpotifySession.previous(context) != SpotifySession.Result.Ok) key(context, KeyEvent.KEYCODE_MEDIA_PREVIOUS)
+    }
 
     private fun key(context: Context, code: Int) {
         val am = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
