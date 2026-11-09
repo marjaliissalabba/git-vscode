@@ -39,12 +39,12 @@ object SpotifyRemote {
             _status.value = "Mangler Client ID"
             return false
         }
-        _status.value = "Kobler til Spotify …"
+        _status.value = "Kobler til … Godta i Spotify hvis den spør."
         val params = ConnectionParams.Builder(clientId)
             .setRedirectUri(REDIRECT_URI)
             .showAuthView(true)
             .build()
-        val result: Result<SpotifyAppRemote> = withTimeoutOrNull(20_000) {
+        val result: Result<SpotifyAppRemote> = withTimeoutOrNull(60_000) {
             suspendCancellableCoroutine { cont ->
                 SpotifyAppRemote.connect(context.applicationContext, params, object : Connector.ConnectionListener {
                     override fun onConnected(r: SpotifyAppRemote) {
@@ -91,6 +91,9 @@ object SpotifyRemote {
                 "Spotify godtok ikke tilkoblingen. Sjekk Client ID, pakkenavn, SHA1 og Redirect URI i Spotify-dashbordet, " +
                     "og at du har lagt til deg selv under «User Management». ($msg)"
             name.contains("Offline") -> "Spotify er i frakoblet modus."
+            msg.contains("Tidsavbrudd") ->
+                "Spotify svarte ikke. Åpne Spotify og spill en sang, gå tilbake hit og prøv igjen. " +
+                    "Sjekk også at Spotify ikke er «sovende app» (Innstillinger → Batteri → Bakgrunnsbegrensninger)."
             else -> "Kunne ikke koble til Spotify: $name ${msg.take(160)}"
         }
     }
