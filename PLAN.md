@@ -8,6 +8,17 @@
 
 ---
 
+## Status (9. nov 2026)
+
+Første versjon av appen er bygget (se README.md):
+- ✅ Fire datakilder: Bluetooth (Cycling Power/FTMS/CSC/puls), ANT+ (kraftmåler), kamera (7-segment-leser med ferdig Stages-mal) og simulator
+- ✅ Kameraleseren er testet mot ekte bilde av konsollet: leser 100 W, 71 rpm og 27,1 km/t riktig
+- ✅ Øktskjerm: store tall, målområde for watt og RPM med farger, nedtelling, profilgraf, tale og vibrasjon ved intervallbytte
+- ✅ 7 økter (inkl. FTP-test), ukeplan i 4-ukers sykluser, oppsummering med NP/TSS/soner og forslag til ny FTP
+- ⏳ Neste: teste på sykkelen (Bluetooth først), deretter Spotify (fase 4) og historikk/tilpasning (fase 5)
+
+---
+
 ## Funn etter bilder av sykkelen (9. nov 2026)
 
 - **Sykkel:** Stages Cycling innendørssykkel (SC-serien) med Stages-konsoll. Konsollet har «LINK HERE – ANT+»-merke.
