@@ -48,3 +48,47 @@ object MusicPolicy {
         return count
     }
 }
+
+/** Tre tempo-lister i Spotify, valgt ut fra målkadensen. */
+enum class CadenceBand(val label: String, val defaultName: String, val rpm: String) {
+    HEAVY("Tung", "Spin Tung", "under 78 rpm"),
+    MEDIUM("Middels", "Spin Middels", "78–97 rpm"),
+    FAST("Rask", "Spin Rask", "98 rpm og over");
+
+    companion object {
+        fun forCadence(rpm: Int): CadenceBand = when {
+            rpm < 78 -> HEAVY
+            rpm < 98 -> MEDIUM
+            else -> FAST
+        }
+
+        fun forSegment(s: Segment) = forCadence(s.midCadence)
+    }
+}
+
+sealed interface MusicAction {
+    data object None : MusicAction
+    data object NextSong : MusicAction
+    data class SwitchList(val band: CadenceBand) : MusicAction
+}
+
+object TempoListPolicy {
+    /**
+     * Hva skal skje med musikken når [next] starter?
+     * - Pauser, oppvarming og korte sprinter: ingenting (sangen spiller videre).
+     * - Hoveddrag med annen kadens enn lista som spiller: bytt liste.
+     * - Hoveddrag med samme kadens: ny sang etter vanlig regel (MusicPolicy).
+     */
+    fun decide(prev: Segment?, next: Segment, secondsSinceLastChange: Int?, playing: CadenceBand?): MusicAction {
+        if (!MusicPolicy.isHard(next) || next.durationSec < MusicPolicy.MIN_SEGMENT_SEC) return MusicAction.None
+        val since = secondsSinceLastChange ?: Int.MAX_VALUE
+        if (since < MusicPolicy.MIN_GAP_SEC) return MusicAction.None
+        val wanted = CadenceBand.forSegment(next)
+        if (wanted != playing) return MusicAction.SwitchList(wanted)
+        return if (MusicPolicy.shouldSkip(prev, next, secondsSinceLastChange)) MusicAction.NextSong else MusicAction.None
+    }
+
+    /** Lista økta starter med (ut fra første intervall). */
+    fun startBand(workout: Workout): CadenceBand =
+        workout.segments.firstOrNull()?.let { CadenceBand.forSegment(it) } ?: CadenceBand.MEDIUM
+}

@@ -35,10 +35,11 @@ Prøv kildene i denne rekkefølgen: Bluetooth, så ANT+, så kamera.
 
 ## Spotify
 
-Appen styrer Spotify-appen på telefonen med vanlige medieknapper. Det krever ingen innlogging eller registrering.
-- Lim inn lenken til en spilleliste (Spotify: ⋯ → Del → Kopier lenke) og trykk «Åpne lista i Spotify».
-- Musikken starter og pauser med økta. «Ny sang inn i hoveddragene» bytter sang når et hardt drag (minst 85 % av FTP, minst 1 min) starter, men aldri inn i pauser, aldri oftere enn hvert 45. sekund, og hardt-til-hardt bare etter 3 min med samme sang. Rolige økter får ingen bytter.
-- ⏮ ⏯ ⏭ vises på øktskjermen.
+Appen styrer Spotify-appen på telefonen. Det krever ingen innlogging eller registrering.
+- **Tempo-lister:** Lag tre lister i Spotify, «Spin Tung» (under 78 rpm), «Spin Middels» (78–97 rpm) og «Spin Rask» (98+ rpm). Når et hoveddrag starter, spiller appen lista som passer målkadensen. Pauser, oppvarming og sprinter under 1 min beholder sangen.
+- **Ny sang inn i hoveddragene:** Når lista allerede passer, byttes sangen ved starten av hardt drag (minst 85 % av FTP, minst 1 min). Aldri oftere enn hvert 45. sekund, og hardt-til-hardt bare etter 3 min.
+- Musikken starter og pauser med økta. ⏮ ⏯ ⏭ vises på øktskjermen.
+- Trykk «Test» ved hver liste i Musikk-kortet for å sjekke at riktig liste spiller.
 
 ## Utvikling
 

@@ -84,6 +84,14 @@ fun RideScreen(activity: MainActivity, workout: Workout, onFinished: (RideSummar
         no.spinapp.SpotifyControl.next(context)
         lastSkipAt = session.elapsedSec
     }
+    // Tempo-lister: hvilken liste (Tung/Middels/Rask) som spiller nå
+    val tempoLists = remember { spotifyOn && AppState.spotifyTempoLists }
+    var playingBand by remember { mutableStateOf<no.spinapp.core.CadenceBand?>(null) }
+    fun switchList(band: no.spinapp.core.CadenceBand) {
+        no.spinapp.SpotifyControl.playPlaylist(activity, AppState.playlistName(band))
+        playingBand = band
+        lastSkipAt = session.elapsedSec
+    }
     fun saveRide(summary: RideSummary) {
         no.spinapp.HistoryStore.add(no.spinapp.core.RideRecord.from(summary, workout.id, ftp, startedAt))
     }
@@ -110,7 +118,15 @@ fun RideScreen(activity: MainActivity, workout: Workout, onFinished: (RideSummar
     // Spotify følger start/pause
     LaunchedEffect(paused) {
         if (!spotifyOn) return@LaunchedEffect
-        if (!paused && !musicPlaying) { no.spinapp.SpotifyControl.play(context); musicPlaying = true }
+        if (!paused && !musicPlaying) {
+            val seg0 = state.segment
+            if (tempoLists && playingBand == null && seg0 != null) {
+                switchList(no.spinapp.core.CadenceBand.forSegment(seg0))
+            } else {
+                no.spinapp.SpotifyControl.play(context)
+            }
+            musicPlaying = true
+        }
         if (paused && musicPlaying && state.elapsedSec > 0) { no.spinapp.SpotifyControl.pause(context); musicPlaying = false }
     }
 
@@ -137,8 +153,15 @@ fun RideScreen(activity: MainActivity, workout: Workout, onFinished: (RideSummar
                 lastIndex = state.segmentIndex
                 coach.segmentChange(state, ftp)
                 val nextSeg = state.segment
-                if (spotifyOn && AppState.spotifySmartSkip && nextSeg != null &&
-                    no.spinapp.core.MusicPolicy.shouldSkip(prevSeg, nextSeg, lastSkipAt?.let { session.elapsedSec - it })
+                val since = lastSkipAt?.let { session.elapsedSec - it }
+                if (tempoLists && nextSeg != null) {
+                    when (val action = no.spinapp.core.TempoListPolicy.decide(prevSeg, nextSeg, since, playingBand)) {
+                        is no.spinapp.core.MusicAction.SwitchList -> switchList(action.band)
+                        no.spinapp.core.MusicAction.NextSong -> if (AppState.spotifySmartSkip) skipSong()
+                        no.spinapp.core.MusicAction.None -> {}
+                    }
+                } else if (spotifyOn && AppState.spotifySmartSkip && nextSeg != null &&
+                    no.spinapp.core.MusicPolicy.shouldSkip(prevSeg, nextSeg, since)
                 ) {
                     skipSong()
                 }

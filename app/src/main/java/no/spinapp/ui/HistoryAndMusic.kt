@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.sp
 import no.spinapp.AppState
 import no.spinapp.HistoryStore
 import no.spinapp.SpotifyControl
+import no.spinapp.core.CadenceBand
 import no.spinapp.core.HistoryStats
 import no.spinapp.core.Retention
 import no.spinapp.core.RideRecord
@@ -144,12 +145,16 @@ fun HistoryScreen(onDone: () -> Unit) {
 @Composable
 fun SpotifyCard() {
     val context = LocalContext.current
+    val activity = context as? android.app.Activity
     val installed = remember { SpotifyControl.isInstalled(context) }
-    var link by remember { mutableStateOf(AppState.spotifyUri ?: "") }
-    var saved by remember { mutableStateOf(AppState.spotifyUri) }
     var control by remember { mutableStateOf(AppState.spotifyControl) }
+    var tempoLists by remember { mutableStateOf(AppState.spotifyTempoLists) }
     var smartSkip by remember { mutableStateOf(AppState.spotifySmartSkip) }
-    var error by remember { mutableStateOf<String?>(null) }
+    val names = remember {
+        androidx.compose.runtime.mutableStateMapOf<CadenceBand, String>().apply {
+            CadenceBand.entries.forEach { put(it, AppState.playlistName(it)) }
+        }
+    }
 
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -158,41 +163,40 @@ fun SpotifyCard() {
                 Text("Spotify-appen er ikke installert på telefonen.", color = Color.Gray, fontSize = 14.sp)
                 return@Column
             }
-            Text(
-                "Appen styrer Spotify på telefonen din: musikken starter og pauser med økta. " +
-                    "Lim inn lenken til favorittlista (i Spotify: ⋯ → Del → Kopier lenke).",
-                color = Color.Gray, fontSize = 13.sp,
-            )
-            OutlinedTextField(
-                value = link,
-                onValueChange = { link = it; error = null },
-                label = { Text("Lenke til spilleliste") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = {
-                    val uri = SpotifyControl.normalizeLink(link)
-                    if (uri == null) {
-                        error = "Finner ikke en Spotify-lenke. Kopier lenken fra Spotify og lim den inn."
-                    } else {
-                        AppState.spotifyUri = uri
-                        saved = uri
-                        link = uri
-                    }
-                }) { Text("Lagre") }
-                OutlinedButton(onClick = { SpotifyControl.openInSpotify(context, saved ?: "spotify:collection:tracks") }) {
-                    Text(if (saved != null) "Åpne lista i Spotify" else "Åpne Likte sanger")
-                }
-            }
-            error?.let { Text(it, color = Color(0xFFE74C3C), fontSize = 13.sp) }
-            Text(
-                "Tips: Åpne lista og trykk spill én gang før økta. Da vet telefonen at det er Spotify som skal styres.",
-                color = Color.Gray, fontSize = 12.sp,
-            )
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("Start og pause musikken med økta", Modifier.weight(1f))
                 Switch(checked = control, onCheckedChange = { control = it; AppState.spotifyControl = it })
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Velg liste etter kadens")
+                    Text(
+                        "Når et hoveddrag starter, spilles lista som passer kadensen. Pauser og korte sprinter beholder sangen.",
+                        color = Color.Gray, fontSize = 12.sp,
+                    )
+                }
+                Switch(checked = tempoLists, onCheckedChange = { tempoLists = it; AppState.spotifyTempoLists = it })
+            }
+            if (tempoLists) {
+                CadenceBand.entries.forEach { band ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        OutlinedTextField(
+                            value = names[band] ?: band.defaultName,
+                            onValueChange = { names[band] = it; AppState.setPlaylistName(band, it) },
+                            label = { Text("${band.label} (${band.rpm})") },
+                            singleLine = true,
+                            modifier = Modifier.weight(1f),
+                        )
+                        TextButton(onClick = {
+                            activity?.let { SpotifyControl.playPlaylist(it, AppState.playlistName(band)) }
+                        }) { Text("Test") }
+                    }
+                }
+                Text(
+                    "Navnene må være like som i Spotify. Trykk «Test»: riktig liste skal begynne å spille, og du skal havne her igjen. " +
+                        "Slå gjerne på tilfeldig rekkefølge (shuffle) i Spotify.",
+                    color = Color.Gray, fontSize = 12.sp,
+                )
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
@@ -203,6 +207,9 @@ fun SpotifyCard() {
                     )
                 }
                 Switch(checked = smartSkip, onCheckedChange = { smartSkip = it; AppState.spotifySmartSkip = it })
+            }
+            OutlinedButton(onClick = { SpotifyControl.openInSpotify(context, "spotify:collection:tracks") }) {
+                Text("Åpne Spotify")
             }
         }
     }

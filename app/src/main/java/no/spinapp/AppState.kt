@@ -83,6 +83,17 @@ object AppState {
         get() = prefs.getBoolean("spotifyControl", true)
         set(v) = prefs.edit().putBoolean("spotifyControl", v).apply()
 
+    /** Bytt mellom tempo-listene (Spin Tung / Middels / Rask) ut fra kadensen. */
+    var spotifyTempoLists: Boolean
+        get() = prefs.getBoolean("spotifyTempoLists", true)
+        set(v) = prefs.edit().putBoolean("spotifyTempoLists", v).apply()
+
+    fun playlistName(band: no.spinapp.core.CadenceBand): String =
+        prefs.getString("playlist_" + band.name, null) ?: band.defaultName
+
+    fun setPlaylistName(band: no.spinapp.core.CadenceBand, name: String) =
+        prefs.edit().putString("playlist_" + band.name, name.trim().ifEmpty { band.defaultName }).apply()
+
     /** Ny sang inn i hoveddragene (se MusicPolicy). */
     var spotifySmartSkip: Boolean
         get() = prefs.getBoolean("spotifySmartSkip", true)
