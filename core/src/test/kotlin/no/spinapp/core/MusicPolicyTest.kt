@@ -1,0 +1,46 @@
+package no.spinapp.core
+
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
+
+class MusicPolicyTest {
+    private val easy = Segment("Pause", 180, 50, 55, 80, 90)
+    private val hard = Segment("Drag", 240, 95, 100, 85, 95)
+    private val sprint = Segment("Sprint", 30, 140, 170, 105, 120)
+
+    @Test
+    fun newSongIntoMainEffort() {
+        assertTrue(MusicPolicy.shouldSkip(easy, hard, null))
+        assertTrue(MusicPolicy.shouldSkip(easy, hard, 300))
+    }
+
+    @Test
+    fun noSkipIntoRecoveryOrShortSprint() {
+        assertFalse(MusicPolicy.shouldSkip(hard, easy, 999))
+        assertFalse(MusicPolicy.shouldSkip(easy, sprint, 999))
+    }
+
+    @Test
+    fun notTooOften() {
+        assertFalse(MusicPolicy.shouldSkip(easy, hard, 20))
+        assertFalse(MusicPolicy.shouldSkip(hard, hard, 120))
+        assertTrue(MusicPolicy.shouldSkip(hard, hard, 200))
+    }
+
+    @Test
+    fun balancedPerWorkout() {
+        // Rolige økter: musikken går i fred
+        assertEquals(0, MusicPolicy.countSkips(WorkoutLibrary.endurance))
+        assertEquals(0, MusicPolicy.countSkips(WorkoutLibrary.recovery))
+        // Ett bytte per hoveddrag
+        assertEquals(3, MusicPolicy.countSkips(WorkoutLibrary.threshold))
+        assertEquals(5, MusicPolicy.countSkips(WorkoutLibrary.vo2))
+        // Ingen økt bytter oftere enn ca. hvert 3. minutt i snitt
+        for (w in WorkoutLibrary.all) {
+            val n = MusicPolicy.countSkips(w)
+            assertTrue(n == 0 || w.durationSec / n >= 180, "${w.name}: $n bytter")
+        }
+    }
+}

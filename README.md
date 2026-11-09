@@ -37,7 +37,7 @@ Prøv kildene i denne rekkefølgen: Bluetooth, så ANT+, så kamera.
 
 Appen styrer Spotify-appen på telefonen med vanlige medieknapper. Det krever ingen innlogging eller registrering.
 - Lim inn lenken til en spilleliste (Spotify: ⋯ → Del → Kopier lenke) og trykk «Åpne lista i Spotify».
-- Musikken starter og pauser med økta. Du kan velge ny sang ved hvert intervall.
+- Musikken starter og pauser med økta. «Ny sang inn i hoveddragene» bytter sang når et hardt drag (minst 85 % av FTP, minst 1 min) starter, men aldri inn i pauser, aldri oftere enn hvert 45. sekund, og hardt-til-hardt bare etter 3 min med samme sang. Rolige økter får ingen bytter.
 - ⏮ ⏯ ⏭ vises på øktskjermen.
 
 ## Utvikling

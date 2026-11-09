@@ -148,7 +148,7 @@ fun SpotifyCard() {
     var link by remember { mutableStateOf(AppState.spotifyUri ?: "") }
     var saved by remember { mutableStateOf(AppState.spotifyUri) }
     var control by remember { mutableStateOf(AppState.spotifyControl) }
-    var nextOnInterval by remember { mutableStateOf(AppState.spotifyNextOnInterval) }
+    var smartSkip by remember { mutableStateOf(AppState.spotifySmartSkip) }
     var error by remember { mutableStateOf<String?>(null) }
 
     Card(Modifier.fillMaxWidth()) {
@@ -195,8 +195,14 @@ fun SpotifyCard() {
                 Switch(checked = control, onCheckedChange = { control = it; AppState.spotifyControl = it })
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Ny sang ved hvert intervall", Modifier.weight(1f))
-                Switch(checked = nextOnInterval, onCheckedChange = { nextOnInterval = it; AppState.spotifyNextOnInterval = it })
+                Column(Modifier.weight(1f)) {
+                    Text("Ny sang inn i hoveddragene")
+                    Text(
+                        "Bytter sang når et hardt drag starter, ikke inn i pauser, og ikke oftere enn nødvendig.",
+                        color = Color.Gray, fontSize = 12.sp,
+                    )
+                }
+                Switch(checked = smartSkip, onCheckedChange = { smartSkip = it; AppState.spotifySmartSkip = it })
             }
         }
     }

@@ -78,6 +78,12 @@ fun RideScreen(activity: MainActivity, workout: Workout, onFinished: (RideSummar
     val startedAt = remember { System.currentTimeMillis() / 1000 }
     val spotifyOn = remember { AppState.spotifyControl && no.spinapp.SpotifyControl.isInstalled(context) }
     var musicPlaying by remember { mutableStateOf(false) }
+    // Sekund i økta da sangen sist ble byttet (av appen eller av deg)
+    var lastSkipAt by remember { mutableStateOf<Int?>(null) }
+    fun skipSong() {
+        no.spinapp.SpotifyControl.next(context)
+        lastSkipAt = session.elapsedSec
+    }
     fun saveRide(summary: RideSummary) {
         no.spinapp.HistoryStore.add(no.spinapp.core.RideRecord.from(summary, workout.id, ftp, startedAt))
     }
@@ -127,9 +133,15 @@ fun RideScreen(activity: MainActivity, workout: Workout, onFinished: (RideSummar
                 return@LaunchedEffect
             }
             if (state.segmentIndex != lastIndex) {
+                val prevSeg = workout.segments.getOrNull(lastIndex)
                 lastIndex = state.segmentIndex
                 coach.segmentChange(state, ftp)
-                if (spotifyOn && AppState.spotifyNextOnInterval) no.spinapp.SpotifyControl.next(context)
+                val nextSeg = state.segment
+                if (spotifyOn && AppState.spotifySmartSkip && nextSeg != null &&
+                    no.spinapp.core.MusicPolicy.shouldSkip(prevSeg, nextSeg, lastSkipAt?.let { session.elapsedSec - it })
+                ) {
+                    skipSong()
+                }
             } else if (state.segmentRemainingSec in 1..3) {
                 coach.beep()
             }
@@ -237,7 +249,7 @@ fun RideScreen(activity: MainActivity, workout: Workout, onFinished: (RideSummar
                     if (musicPlaying) no.spinapp.SpotifyControl.pause(context) else no.spinapp.SpotifyControl.play(context)
                     musicPlaying = !musicPlaying
                 }) { Text(if (musicPlaying) "⏸" else "▶", fontSize = 20.sp) }
-                TextButton(onClick = { no.spinapp.SpotifyControl.next(context) }) { Text("⏭", fontSize = 20.sp) }
+                TextButton(onClick = { skipSong() }) { Text("⏭", fontSize = 20.sp) }
             }
         }
 

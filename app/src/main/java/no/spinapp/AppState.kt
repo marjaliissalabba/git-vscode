@@ -83,9 +83,9 @@ object AppState {
         get() = prefs.getBoolean("spotifyControl", true)
         set(v) = prefs.edit().putBoolean("spotifyControl", v).apply()
 
-    /** Ny sang ved hvert nytt intervall. */
-    var spotifyNextOnInterval: Boolean
-        get() = prefs.getBoolean("spotifyNextOnInterval", false)
-        set(v) = prefs.edit().putBoolean("spotifyNextOnInterval", v).apply()
+    /** Ny sang inn i hoveddragene (se MusicPolicy). */
+    var spotifySmartSkip: Boolean
+        get() = prefs.getBoolean("spotifySmartSkip", true)
+        set(v) = prefs.edit().putBoolean("spotifySmartSkip", v).apply()
 
 }
