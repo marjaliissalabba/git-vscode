@@ -8,14 +8,26 @@
 
 ---
 
-## Status (9. nov 2026)
+## Status (9. nov 2026, versjon 0.4)
 
-Første versjon av appen er bygget (se README.md):
-- ✅ Fire datakilder: Bluetooth (Cycling Power/FTMS/CSC/puls), ANT+ (kraftmåler), kamera (7-segment-leser med ferdig Stages-mal) og simulator
-- ✅ Kameraleseren er testet mot ekte bilde av konsollet: leser 100 W, 71 rpm og 27,1 km/t riktig
-- ✅ Øktskjerm: store tall, målområde for watt og RPM med farger, nedtelling, profilgraf, tale og vibrasjon ved intervallbytte
-- ✅ 7 økter (inkl. FTP-test), ukeplan i 4-ukers sykluser, oppsummering med NP/TSS/soner og forslag til ny FTP
-- ⏳ Neste: teste på sykkelen (Bluetooth først), deretter Spotify (fase 4) og historikk/tilpasning (fase 5)
+| Fase | Status |
+|---|---|
+| 0. Avklaring | ✅ Stages SC-sykkel med ANT+-konsoll, Galaxy A56 (Android), uten pulsbelte foreløpig |
+| 1. Lese data | ✅ Bluetooth, ANT+, kamera og simulator i appen. Kameraleseren leser bildet av konsollet riktig. ⏳ Ikke testet på selve sykkelen |
+| 2. Teller + økt | ✅ Rund måler i % av FTP med 8 sonefarger (100 % = oransje), hvit målbue og pil, RPM under, intervalltid og neste intervall, tale og vibrasjon, hopp over oppvarming |
+| 3. FTP + treningsmotor | ✅ 7 økter inkl. FTP-test, ukeplan, oppsummering med forslag til ny FTP. ⏳ Mangler lagret historikk |
+| Innlogging | ✅ E-post + engangskode (bare e-post lagres). ⏳ Venter på Supabase-oppsett |
+| 4. Spotify | ⏳ Ikke startet |
+| 5. Tilpasning | ⏳ Ikke startet (FTP-forslag finnes, men ingen historikk ennå) |
+| 6. Polering | Delvis: tale og mørkt tema er på plass. Strava-eksport mangler |
+
+**Neste steg, i rekkefølge**
+1. Installere versjon 0.4 og prøve en økt med simulatoren
+2. Teste på sykkelen: Bluetooth først, så kamera
+3. Kjøre FTP-testen for å få riktig FTP
+4. Lagre historikk over økter (grunnlaget for tilpasning)
+5. Spotify-spilleliste etter kadens og intensitet
+6. Sette opp Supabase, så innloggingen slås på
 
 ---
 
