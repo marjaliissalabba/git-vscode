@@ -12,8 +12,8 @@ android {
         applicationId = "no.spinapp"
         minSdk = 26
         targetSdk = 35
-        versionCode = 3
-        versionName = "0.3"
+        versionCode = 4
+        versionName = "0.4"
 
         // Innlogging (Supabase). Settes som miljøvariabler eller i gradle.properties.
         // Tom verdi = innlogging er av, og appen kan brukes uten konto.

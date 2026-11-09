@@ -1,13 +1,15 @@
 package no.spinapp.ui
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -25,20 +27,26 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import no.spinapp.core.TargetStatus
 import no.spinapp.core.Zone
+import kotlin.math.cos
 import kotlin.math.min
 import kotlin.math.roundToInt
+import kotlin.math.sin
 
 private const val START_ANGLE = 135f
 private const val SWEEP = 270f
-private const val CAD_MIN = 40f
-private const val CAD_MAX = 130f
 
-val StatusGood = Color(0xFF2ECC71)
+val StatusGood = Color(0xFF2EE07A)
 val StatusBad = Color(0xFFE74C3C)
 
+fun statusColor(s: TargetStatus) = when (s) {
+    TargetStatus.IN_RANGE -> StatusGood
+    TargetStatus.NO_DATA -> Color.Gray
+    else -> StatusBad
+}
+
 /**
- * Rund måler: ytre ring = % av FTP med sonefarger, hvit bue = målet, pil = deg.
- * Indre ring = kadens (RPM) med målområdet.
+ * Rund måler: tynn bue med sonefarger (% av FTP), hvit bue utenfor = målet,
+ * hvit pil = deg. I midten: %, watt, sone og kadens.
  */
 @Composable
 fun PowerGauge(
@@ -49,7 +57,6 @@ fun PowerGauge(
     cadence: Int?,
     cadenceLow: Int?,
     cadenceHigh: Int?,
-    powerStatus: TargetStatus,
     cadenceStatus: TargetStatus,
     modifier: Modifier = Modifier,
 ) {
@@ -59,136 +66,98 @@ fun PowerGauge(
 
     BoxWithConstraints(modifier, contentAlignment = Alignment.Center) {
         val side = min(maxWidth.value, maxHeight.value).dp
-        val scale = side.value / 360f
+        val scale = side.value / 340f
 
         Canvas(Modifier.size(side)) {
-            val outerStroke = size.minDimension * 0.085f
-            val innerStroke = size.minDimension * 0.035f
-            val pad = outerStroke / 2 + size.minDimension * 0.05f
-            val outerTopLeft = Offset(pad, pad)
-            val outerSize = Size(size.width - pad * 2, size.height - pad * 2)
+            val stroke = size.minDimension * 0.022f
+            val pad = size.minDimension * 0.06f
+            val topLeft = Offset(pad, pad)
+            val arcSize = Size(size.width - pad * 2, size.height - pad * 2)
+            val radius = arcSize.width / 2
 
             fun angle(p: Float) = START_ANGLE + (p.coerceIn(0f, maxPct) / maxPct) * SWEEP
-
-            // Sonebuer
-            for (z in Zone.entries) {
-                val from = z.lowPct.toFloat().coerceAtMost(maxPct)
-                val to = minOf(z.highPct + 1f, maxPct)
-                if (to <= from) continue
-                val active = zone == z
-                drawArc(
-                    color = Color(z.argb).copy(alpha = if (zone == null || active) 1f else 0.55f),
-                    startAngle = angle(from) + 0.8f,
-                    sweepAngle = angle(to) - angle(from) - 1.6f,
-                    useCenter = false,
-                    topLeft = outerTopLeft,
-                    size = outerSize,
-                    style = Stroke(width = if (active) outerStroke * 1.25f else outerStroke),
-                )
+            fun point(deg: Float, r: Float): Offset {
+                val a = Math.toRadians(deg.toDouble())
+                return Offset(center.x + (r * cos(a)).toFloat(), center.y + (r * sin(a)).toFloat())
             }
 
-            // Målet: hvit bue utenfor sonene
+            // Sonebuer med små mellomrom
+            val zones = Zone.entries.filter { it.lowPct < maxPct }
+            zones.forEachIndexed { i, z ->
+                val from = angle(z.lowPct.toFloat())
+                val to = angle(minOf(z.highPct + 1f, maxPct))
+                val gap = 0.9f
+                drawArc(
+                    color = Color(z.argb),
+                    startAngle = from + if (i == 0) 0f else gap,
+                    sweepAngle = to - from - (if (i == 0) 0f else gap) - (if (i == zones.lastIndex) 0f else gap),
+                    useCenter = false,
+                    topLeft = topLeft,
+                    size = arcSize,
+                    style = Stroke(width = stroke, cap = StrokeCap.Butt),
+                )
+            }
+            // Runde ender
+            drawCircle(Color(zones.first().argb), stroke / 2, point(START_ANGLE, radius))
+            drawCircle(Color(zones.last().argb), stroke / 2, point(START_ANGLE + SWEEP, radius))
+
+            // Målet: hvit bue utenfor
             if (targetLowPct != null && targetHighPct != null) {
-                val off = outerStroke * 0.95f
+                val off = stroke * 2.4f
+                val a0 = angle(targetLowPct.toFloat())
+                val a1 = angle(targetHighPct.toFloat())
                 drawArc(
                     color = Color.White,
-                    startAngle = angle(targetLowPct.toFloat()),
-                    sweepAngle = (angle(targetHighPct.toFloat()) - angle(targetLowPct.toFloat())).coerceAtLeast(2f),
+                    startAngle = a0,
+                    sweepAngle = (a1 - a0).coerceAtLeast(2f),
                     useCenter = false,
-                    topLeft = outerTopLeft - Offset(off, off),
-                    size = Size(outerSize.width + off * 2, outerSize.height + off * 2),
-                    style = Stroke(width = outerStroke * 0.28f, cap = StrokeCap.Round),
+                    topLeft = topLeft - Offset(off, off),
+                    size = Size(arcSize.width + off * 2, arcSize.height + off * 2),
+                    style = Stroke(width = stroke * 1.3f, cap = StrokeCap.Round),
                 )
             }
 
-            // Pil for nåværende watt
+            // Pil innenfor buen, peker ut mot nåværende %
             if (pct != null) {
-                drawPointer(angle(pct.toFloat()), outerSize.width / 2 - outerStroke * 0.9f, outerStroke * 0.9f)
-            }
-
-            // Indre ring: kadens
-            val innerPad = pad + outerStroke * 1.6f
-            val innerTopLeft = Offset(innerPad, innerPad)
-            val innerSize = Size(size.width - innerPad * 2, size.height - innerPad * 2)
-            fun cadAngle(c: Float) = START_ANGLE + ((c.coerceIn(CAD_MIN, CAD_MAX) - CAD_MIN) / (CAD_MAX - CAD_MIN)) * SWEEP
-            drawArc(Color.White.copy(alpha = 0.12f), START_ANGLE, SWEEP, false, innerTopLeft, innerSize,
-                style = Stroke(innerStroke, cap = StrokeCap.Round))
-            if (cadenceLow != null && cadenceHigh != null) {
-                drawArc(
-                    StatusGood.copy(alpha = 0.55f), cadAngle(cadenceLow.toFloat()),
-                    cadAngle(cadenceHigh.toFloat()) - cadAngle(cadenceLow.toFloat()), false, innerTopLeft, innerSize,
-                    style = Stroke(innerStroke, cap = StrokeCap.Round),
-                )
-            }
-            if (cadence != null) {
-                val a = Math.toRadians(cadAngle(cadence.toFloat()).toDouble())
-                val r = innerSize.width / 2
-                val c = Offset(size.width / 2 + (r * kotlin.math.cos(a)).toFloat(), size.height / 2 + (r * kotlin.math.sin(a)).toFloat())
-                val col = if (cadenceStatus == TargetStatus.IN_RANGE) StatusGood else if (cadenceStatus == TargetStatus.NO_DATA) Color.Gray else StatusBad
-                drawCircle(Color.Black, innerStroke * 1.25f, c)
-                drawCircle(col, innerStroke * 1.0f, c)
+                drawPointer(angle(pct.toFloat()), radius - stroke * 1.6f, size.minDimension * 0.07f)
             }
         }
 
-        // Tekst i midten
-        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(top = (side * 0.06f))) {
+        // Midten
+        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(top = side * 0.04f)) {
             Text(
                 text = pct?.let { "${it.roundToInt()}%" } ?: "–",
-                fontSize = (78 * scale).sp, fontWeight = FontWeight.Bold, color = Color.White,
+                fontSize = (84 * scale).sp, fontWeight = FontWeight.Bold, color = Color.White,
+                lineHeight = (88 * scale).sp,
             )
             Text(
                 text = "${powerW ?: "–"} W",
-                fontSize = (26 * scale).sp, fontWeight = FontWeight.SemiBold, color = Color.White,
+                fontSize = (34 * scale).sp, fontWeight = FontWeight.Bold, color = Color.White,
             )
             Text(
                 text = zone?.label ?: "av FTP",
-                fontSize = (15 * scale).sp, color = zone?.let { Color(it.argb) } ?: Color.Gray,
+                fontSize = (20 * scale).sp, fontWeight = FontWeight.Medium,
+                color = zone?.let { Color(it.argb) } ?: Color.Gray,
             )
-            val cadColor = when (cadenceStatus) {
-                TargetStatus.IN_RANGE -> StatusGood
-                TargetStatus.NO_DATA -> Color.Gray
-                else -> StatusBad
-            }
-            Row(verticalAlignment = Alignment.Bottom, modifier = Modifier.padding(top = (4 * scale).dp)) {
-                Text("${cadence ?: "–"}", fontSize = (34 * scale).sp, fontWeight = FontWeight.Bold, color = cadColor)
-                Text(" rpm", fontSize = (16 * scale).sp, color = Color.Gray, modifier = Modifier.padding(bottom = (5 * scale).dp))
-            }
-            if (cadenceLow != null && cadenceHigh != null) {
-                Text("mål $cadenceLow–$cadenceHigh", fontSize = (14 * scale).sp, color = Color.Gray)
-            }
-        }
-
-        // Hjørner: mål og hint
-        Box(Modifier.size(side)) {
-            Column(Modifier.align(Alignment.TopStart)) {
-                Text("MÅL", fontSize = (13 * scale).sp, color = Color.Gray, fontWeight = FontWeight.Bold)
+            Box(
+                Modifier
+                    .padding(vertical = (10 * scale).dp)
+                    .width((26 * scale).dp)
+                    .height(1.dp)
+                    .background(Color.Gray)
+            )
+            Row(verticalAlignment = Alignment.Bottom) {
                 Text(
-                    if (targetLowPct != null) "$targetLowPct–$targetHighPct%" else "–",
-                    fontSize = (20 * scale).sp, fontWeight = FontWeight.Bold, color = Color.White,
+                    "${cadence ?: "–"}",
+                    fontSize = (44 * scale).sp, fontWeight = FontWeight.Bold, color = statusColor(cadenceStatus),
+                )
+                Text(
+                    " rpm", fontSize = (24 * scale).sp, color = Color.LightGray,
+                    modifier = Modifier.padding(bottom = (7 * scale).dp),
                 )
             }
-            Column(Modifier.align(Alignment.TopEnd), horizontalAlignment = Alignment.End) {
-                Text("WATT", fontSize = (13 * scale).sp, color = Color.Gray, fontWeight = FontWeight.Bold)
-                val hint = when (powerStatus) {
-                    TargetStatus.LOW -> "▲ Øk"
-                    TargetStatus.HIGH -> "▼ Senk"
-                    TargetStatus.IN_RANGE -> "✓ Bra"
-                    TargetStatus.NO_DATA -> "–"
-                }
-                val col = when (powerStatus) {
-                    TargetStatus.IN_RANGE -> StatusGood
-                    TargetStatus.NO_DATA -> Color.Gray
-                    else -> StatusBad
-                }
-                Text(hint, fontSize = (20 * scale).sp, fontWeight = FontWeight.Bold, color = col)
-            }
-            Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                val cadHint = when (cadenceStatus) {
-                    TargetStatus.LOW -> "▲ Raskere tråkk"
-                    TargetStatus.HIGH -> "▼ Roligere tråkk"
-                    else -> ""
-                }
-                if (cadHint.isNotEmpty()) Text(cadHint, fontSize = (16 * scale).sp, color = StatusBad, fontWeight = FontWeight.Bold)
+            if (cadenceLow != null && cadenceHigh != null) {
+                Text("mål $cadenceLow–$cadenceHigh", fontSize = (19 * scale).sp, color = Color.LightGray)
             }
         }
     }
@@ -196,16 +165,16 @@ fun PowerGauge(
 
 private fun DrawScope.drawPointer(angleDeg: Float, radius: Float, len: Float) {
     rotate(angleDeg, pivot = center) {
-        // Tegnet mot høyre (0°), rotert til riktig vinkel
-        val tipX = center.x + radius - len * 0.05f
+        // Tegnet mot høyre (0°) og rotert til riktig vinkel. Spissen peker ut mot buen.
+        val tipX = center.x + radius
         val baseX = tipX - len
         val path = Path().apply {
             moveTo(tipX, center.y)
-            lineTo(baseX, center.y - len * 0.42f)
-            lineTo(baseX, center.y + len * 0.42f)
+            lineTo(baseX, center.y - len * 0.38f)
+            lineTo(baseX + len * 0.18f, center.y)
+            lineTo(baseX, center.y + len * 0.38f)
             close()
         }
-        drawPath(path, Color.Black, style = Stroke(width = 6f))
         drawPath(path, Color.White)
     }
 }

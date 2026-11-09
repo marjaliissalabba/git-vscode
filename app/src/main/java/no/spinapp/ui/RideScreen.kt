@@ -50,6 +50,7 @@ import no.spinapp.MainActivity
 import no.spinapp.core.RideSession
 import no.spinapp.core.RideState
 import no.spinapp.core.RideSummary
+import no.spinapp.core.TargetStatus
 import no.spinapp.core.Workout
 import no.spinapp.sources.freshSample
 import java.util.Locale
@@ -132,15 +133,18 @@ fun RideScreen(activity: MainActivity, workout: Workout, onFinished: (RideSummar
             .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        // Topp: økt og total tid
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        // Topp: økt, intervallnavn og total tid
+        Row(verticalAlignment = Alignment.Bottom) {
             Column(Modifier.weight(1f)) {
-                Text(workout.name, fontSize = 14.sp, color = Color.Gray)
-                Text(seg?.name ?: "Ferdig", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = zoneColor)
+                Text(workout.name, fontSize = 17.sp, color = Color.White)
+                Text(
+                    seg?.name ?: "Ferdig", fontSize = 32.sp, fontWeight = FontWeight.Bold, color = zoneColor,
+                    maxLines = 1, lineHeight = 36.sp,
+                )
             }
             Column(horizontalAlignment = Alignment.End) {
-                Text("IGJEN AV ØKTA", fontSize = 11.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
-                Text(formatTime(state.totalRemainingSec), fontSize = 20.sp, color = Color.White, fontFamily = FontFamily.Monospace)
+                Text("Igjen av økta", fontSize = 15.sp, color = Color.LightGray)
+                Text(formatTime(state.totalRemainingSec), fontSize = 32.sp, color = Color.White, fontWeight = FontWeight.Medium)
             }
         }
 
@@ -148,39 +152,55 @@ fun RideScreen(activity: MainActivity, workout: Workout, onFinished: (RideSummar
         Row(
             Modifier
                 .fillMaxWidth()
-                .background(zoneColor.copy(alpha = 0.18f), RoundedCornerShape(16.dp))
-                .padding(horizontal = 14.dp, vertical = 8.dp),
+                .background(zoneColor.copy(alpha = 0.20f), RoundedCornerShape(20.dp))
+                .padding(horizontal = 18.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(Modifier.weight(1f)) {
-                Text("DETTE INTERVALLET", fontSize = 11.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
+                Text("Dette intervallet", fontSize = 15.sp, color = Color.LightGray)
                 Text(
                     formatTime(state.segmentRemainingSec),
-                    fontSize = 50.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, color = Color.White,
+                    fontSize = 56.sp, fontWeight = FontWeight.Bold, color = Color.White, lineHeight = 60.sp,
                 )
             }
             val n = state.nextSegment
-            Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    Modifier
-                        .width(6.dp)
-                        .height(64.dp)
-                        .background(n?.let { Color(it.zone.argb) } ?: Color.DarkGray, RoundedCornerShape(3.dp))
-                )
-                Column(Modifier.padding(start = 10.dp)) {
-                    Text("NESTE", fontSize = 11.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
-                    if (n != null) {
-                        Text(n.name, fontSize = 16.sp, color = Color.White, fontWeight = FontWeight.SemiBold, maxLines = 1)
-                        Text("${formatTime(n.durationSec)} · ${n.powerLowPct}–${n.powerHighPct}%", fontSize = 15.sp, color = Color(n.zone.argb))
-                        Text("${n.cadenceLow}–${n.cadenceHigh} rpm", fontSize = 14.sp, color = Color.LightGray)
-                    } else {
-                        Text("Siste intervall!", fontSize = 16.sp, color = Color.White)
-                    }
+            Box(
+                Modifier
+                    .width(5.dp)
+                    .height(80.dp)
+                    .background(n?.let { Color(it.zone.argb) } ?: Color.DarkGray, RoundedCornerShape(3.dp))
+            )
+            Column(Modifier.weight(1.1f).padding(start = 14.dp)) {
+                Text("Neste", fontSize = 15.sp, color = Color.LightGray)
+                if (n != null) {
+                    Text(n.name, fontSize = 18.sp, color = Color.White, fontWeight = FontWeight.Bold, maxLines = 1)
+                    Text("${formatTime(n.durationSec)} · ${n.powerLowPct}–${n.powerHighPct}%", fontSize = 17.sp, color = Color(n.zone.argb))
+                    Text("${n.cadenceLow}–${n.cadenceHigh} rpm", fontSize = 16.sp, color = Color.LightGray)
+                } else {
+                    Text("Siste intervall!", fontSize = 18.sp, color = Color.White, fontWeight = FontWeight.Bold)
                 }
             }
         }
 
-        // Rund måler: % av FTP og kadens
+        // Mål og om du treffer
+        Row(verticalAlignment = Alignment.Bottom, modifier = Modifier.padding(top = 4.dp)) {
+            Column(Modifier.weight(1f)) {
+                Text("Mål", fontSize = 15.sp, color = Color.LightGray)
+                Text(
+                    if (seg != null) "${seg.powerLowPct}–${seg.powerHighPct}%" else "–",
+                    fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.White,
+                )
+            }
+            val hint = when (state.powerStatus) {
+                TargetStatus.LOW -> "▲ Øk"
+                TargetStatus.HIGH -> "▼ Senk"
+                TargetStatus.IN_RANGE -> "✓ Bra"
+                TargetStatus.NO_DATA -> ""
+            }
+            Text(hint, fontSize = 26.sp, fontWeight = FontWeight.Bold, color = statusColor(state.powerStatus))
+        }
+
+        // Rund måler: % av FTP, watt og kadens
         PowerGauge(
             ftp = ftp,
             powerW = state.powerW,
@@ -189,12 +209,11 @@ fun RideScreen(activity: MainActivity, workout: Workout, onFinished: (RideSummar
             cadence = state.cadenceRpm,
             cadenceLow = seg?.cadenceLow,
             cadenceHigh = seg?.cadenceHigh,
-            powerStatus = state.powerStatus,
             cadenceStatus = state.cadenceStatus,
             modifier = Modifier.fillMaxWidth().weight(1f),
         )
 
-        WorkoutProfile(workout, ftp, state.elapsedSec, Modifier.fillMaxWidth().height(56.dp))
+        WorkoutProfile(workout, ftp, state.elapsedSec, Modifier.fillMaxWidth().height(64.dp))
         Text(sourceStatus, color = Color.Gray, fontSize = 12.sp)
 
         if (session.inWarmup()) {
@@ -240,9 +259,8 @@ fun WorkoutProfile(workout: Workout, ftp: Int, progressSec: Int?, modifier: Modi
         for (s in workout.segments) {
             val w = s.durationSec / total * size.width
             val h = (s.midPct.toFloat() / maxPct) * size.height
-            val done = progressSec != null && progressSec >= 0
             drawRect(
-                color = Color(s.zone.argb).copy(alpha = if (done) 0.85f else 1f),
+                color = Color(s.zone.argb),
                 topLeft = Offset(x, size.height - h),
                 size = Size(maxOf(1f, w - 0.5f), h),
             )
@@ -253,7 +271,6 @@ fun WorkoutProfile(workout: Workout, ftp: Int, progressSec: Int?, modifier: Modi
         drawLine(Color.White.copy(alpha = 0.35f), Offset(0f, ftpY), Offset(size.width, ftpY), strokeWidth = 2f)
         if (progressSec != null) {
             val px = progressSec / total * size.width
-            drawRect(Color.Black.copy(alpha = 0.45f), Offset(0f, 0f), Size(px, size.height))
             drawLine(Color.White, Offset(px, 0f), Offset(px, size.height), strokeWidth = 4f)
         }
     }
