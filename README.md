@@ -27,7 +27,7 @@ Prøv kildene i denne rekkefølgen: Bluetooth, så ANT+, så kamera.
 
 ## Personvern og lagring
 
-- Ingen konto og ingen innlogging. Appen har ikke tilgang til internett.
+- Ingen konto og ingen innlogging i SpinApp. Spotifys innloggingsbibliotek gir appen internettillatelse, men den brukes bare til Spotify-innloggingen hvis Spotify-appen ikke kan ta den selv. Treningsdata sendes aldri noe sted.
 - Øktene lagres bare på telefonen, som en kort oppsummering (ca. 0,3 kB per økt). Ingen data per sekund.
 - Gamle økter slettes automatisk (standard: etter 1 år; kan endres til 3 eller 6 måneder). Maks 1000 økter.
 - «Historikk og lagring» på forsiden: slett enkeltøkter eller alt.

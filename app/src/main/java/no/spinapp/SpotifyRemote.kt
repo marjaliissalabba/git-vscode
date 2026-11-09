@@ -7,6 +7,7 @@ import com.spotify.android.appremote.api.SpotifyAppRemote
 import com.spotify.protocol.client.CallResult
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.coroutines.resume
@@ -29,6 +30,52 @@ object SpotifyRemote {
     val nowPlaying: StateFlow<String?> = _nowPlaying
 
     val isConfigured get() = AppState.spotifyClientId.isNotBlank()
+
+    const val AUTH_REQUEST_CODE = 0x5A1
+    private val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Main)
+
+    /**
+     * Steg 1: Spotifys innloggingsside, der du godkjenner at SpinApp kan styre Spotify.
+     * Svaret kommer i MainActivity.onActivityResult → [handleAuthResult].
+     */
+    fun authorize(activity: android.app.Activity) {
+        val clientId = AppState.spotifyClientId.trim()
+        if (clientId.isEmpty()) {
+            _status.value = "Mangler Client ID"
+            return
+        }
+        _status.value = "Åpner Spotify-innlogging …"
+        val request = com.spotify.sdk.android.auth.AuthorizationRequest.Builder(
+            clientId,
+            com.spotify.sdk.android.auth.AuthorizationResponse.Type.TOKEN,
+            REDIRECT_URI,
+        ).setScopes(arrayOf("app-remote-control")).setShowDialog(false).build()
+        com.spotify.sdk.android.auth.AuthorizationClient.openLoginActivity(activity, AUTH_REQUEST_CODE, request)
+    }
+
+    /** Steg 2: svar fra innloggingen. Ved godkjenning kobles det til med en gang. */
+    fun handleAuthResult(context: Context, resultCode: Int, data: android.content.Intent?) {
+        val response = com.spotify.sdk.android.auth.AuthorizationClient.getResponse(resultCode, data)
+        when (response.type) {
+            com.spotify.sdk.android.auth.AuthorizationResponse.Type.TOKEN -> {
+                _status.value = "✓ Godkjent. Kobler til …"
+                scope.launch { connect(context) }
+            }
+            com.spotify.sdk.android.auth.AuthorizationResponse.Type.ERROR ->
+                _status.value = "Spotify avviste innloggingen: ${response.error}. " + hintFor(response.error.orEmpty())
+            else -> _status.value = "Innloggingen ble avbrutt."
+        }
+    }
+
+    private fun hintFor(error: String): String = when {
+        error.contains("INVALID_CLIENT", true) -> "Sjekk at Client ID er riktig."
+        error.contains("redirect", true) -> "Sjekk Redirect URI i dashbordet: $REDIRECT_URI"
+        error.contains("fingerprint", true) || error.contains("package", true) ->
+            "Sjekk pakkenavn og SHA1 under Android packages i dashbordet."
+        error.contains("access", true) || error.contains("user", true) ->
+            "Sjekk at e-posten din står under User Management i dashbordet."
+        else -> ""
+    }
     val isConnected get() = remote?.isConnected == true
 
     /** Kobler til Spotify. Første gang spør Spotify om du godtar tilkoblingen. */

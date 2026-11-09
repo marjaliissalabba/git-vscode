@@ -12,8 +12,12 @@ android {
         applicationId = "no.spinapp"
         minSdk = 26
         targetSdk = 35
-        versionCode = 11
-        versionName = "0.11"
+        versionCode = 12
+        versionName = "0.12"
+
+        // Spotify-innlogging: må stemme med Redirect URI spinapp://spotify-callback
+        manifestPlaceholders["redirectSchemeName"] = "spinapp"
+        manifestPlaceholders["redirectHostName"] = "spotify-callback"
     }
 
     // Fast utviklingsnøkkel, slik at nye versjoner kan installeres over den gamle.
@@ -54,6 +58,7 @@ dependencies {
     // Spotify App Remote SDK (Apache 2.0): styrer Spotify-appen på telefonen
     implementation(files("libs/spotify-app-remote-release-0.8.0.aar"))
     implementation("com.google.code.gson:gson:2.11.0")
+    implementation("com.spotify.android:auth:2.1.1")
 
     implementation("androidx.core:core-ktx:1.15.0")
     implementation("androidx.activity:activity-compose:1.9.3")

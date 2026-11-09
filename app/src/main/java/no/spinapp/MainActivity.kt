@@ -90,6 +90,15 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    @Deprecated("Spotify-innloggingen bruker fortsatt onActivityResult")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: android.content.Intent?) {
+        @Suppress("DEPRECATION")
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == SpotifyRemote.AUTH_REQUEST_CODE) {
+            SpotifyRemote.handleAuthResult(this, resultCode, data)
+        }
+    }
+
     /** Lager (eller gjenbruker) datakilden som er valgt i innstillingene. */
     fun activeSource(): BikeDataSource? {
         val type = AppState.sourceType

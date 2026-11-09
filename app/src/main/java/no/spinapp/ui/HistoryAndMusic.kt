@@ -189,7 +189,11 @@ fun SpotifyCard() {
             )
             if (clientId.isNotBlank()) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Button(onClick = { scope.launch { no.spinapp.SpotifyRemote.connect(context) } }) { Text("Koble til") }
+                    Button(onClick = {
+                        val act = context as? android.app.Activity
+                        if (act != null) no.spinapp.SpotifyRemote.authorize(act)
+                        else scope.launch { no.spinapp.SpotifyRemote.connect(context) }
+                    }) { Text("Koble til") }
                     Text(
                         remoteStatus, Modifier.padding(start = 10.dp).weight(1f), fontSize = 13.sp,
                         color = if (remoteStatus.startsWith("✓")) StatusGood else Color.LightGray,
