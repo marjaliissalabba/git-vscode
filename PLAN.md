@@ -11,7 +11,7 @@
 ## Funn etter bilder av sykkelen (9. nov 2026)
 
 - **Sykkel:** Stages Cycling innendørssykkel (SC-serien) med Stages-konsoll. Konsollet har «LINK HERE – ANT+»-merke.
-- **Telefon:** Android. **Pulsbelte:** ikke ennå (kommer senere, velg et med både Bluetooth og ANT+).
+- **Telefon:** Samsung Galaxy A56 5G (Android). A-serien har normalt **ikke innebygd ANT+**-radio, så ANT+ krever trolig en USB ANT+-pinne. Bluetooth-testen (nRF Connect) avgjør om vi klarer oss uten. **Pulsbelte:** ikke ennå (kommer senere, velg et med både Bluetooth og ANT+).
 - **Konsollet viser ekte watt** (fra kraftmåleren i kranken). Vi trenger altså **ikke** estimere watt fra motstand.
 - **Felter på displayet** (venstre = nå, høyre = snitt): kJ (punktmatrise øverst), WATTS, RPM, SPEED (km/t), KCAL og KCAL/HR, TIME (t:mm:ss), DIST (km).
   Alt unntatt kJ er 7-segment-tall. Oppsettet er fast, så vi kan ha en **ferdig mal for Stages-konsollet** og slipper å markere feltene for hånd. Du justerer bare plasseringen.
