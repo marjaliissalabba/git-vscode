@@ -108,11 +108,20 @@ textarea#jsonOut { width: 100%; height: 120px; background: #0d0e16; color: var(-
 .findings li { border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; cursor: pointer; }
 .findings li.bad { border-color: var(--warn); }
 .findings li:hover { background: var(--panel-2); }
+.tools { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.tools button { border: 0; border-radius: 0; min-height: 34px; padding: 5px 10px; background: transparent; cursor: pointer; font-size: 13px; }
+.tools button[aria-pressed="true"] { background: var(--accent-tint); color: var(--accent-ink); }
+.xf { display: grid; grid-template-columns: auto 1fr; gap: 6px 10px; align-items: center; font-size: 13px; }
+.xf label { color: var(--muted); }
+.xf input[type=number] { width: 100%; background: #12141f; border: 1px solid var(--line); border-radius: 6px; padding: 4px 6px; font-family: var(--font-num); text-align: right; }
+.xf input[type=range] { width: 100%; accent-color: var(--accent); }
 @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
 </style>
 
 <header class="top">
   <div class="brand"><h1>Ekorn Sprite-studio</h1><span id="packName">Laster pakken …</span></div>
+  <button class="btn small" id="undoBtn" type="button" title="Angre (Ctrl+Z)" disabled>↶ Angre</button>
+  <button class="btn small" id="redoBtn" type="button" title="Gjør om (Ctrl+Shift+Z)" disabled>↷ Gjør om</button>
   <label class="btn" for="fileIn">Åpne pakke (zip eller filer)</label>
   <input id="fileIn" type="file" multiple accept=".zip,.json,.png" hidden>
   <button class="btn" id="copyBtn" type="button">Kopier JSON</button>
@@ -125,6 +134,15 @@ textarea#jsonOut { width: 100%; height: 120px; background: #0d0e16; color: var(-
 
   <section class="stage">
     <div class="canvasWrap"><canvas id="editor" width="1024" height="1024" aria-label="Rediger ankerpunkt: klikk der bekkenet er"></canvas></div>
+    <div class="toolbar">
+      <div class="tools" role="group" aria-label="Verktøy">
+        <button type="button" data-tool="anchor" aria-pressed="true" title="Klikk for å sette ankeret (A)">⊕ Anker</button>
+        <button type="button" data-tool="move" aria-pressed="false" title="Dra for å flytte figuren (V)">✥ Flytt</button>
+        <button type="button" data-tool="rotate" aria-pressed="false" title="Dra rundt ankeret for å rotere (R). Shift = 15°-steg">⟳ Roter</button>
+        <button type="button" data-tool="scale" aria-pressed="false" title="Dra bort fra / mot ankeret for å skalere (S)">⤢ Skaler</button>
+      </div>
+      <label class="inline" for="allFrames"><input type="checkbox" id="allFrames"> Alle bilder i klippet</label>
+    </div>
     <div class="toolbar">
       <button class="btn small" id="prevBtn" type="button" title="Forrige bilde ( , )">◀</button>
       <button class="btn small" id="playBtn" type="button" aria-pressed="false">▶ Spill</button>
@@ -165,6 +183,7 @@ textarea#jsonOut { width: 100%; height: 120px; background: #0d0e16; color: var(-
         <dt>Bilde</dt><dd id="kFrame">–</dd>
         <dt>Anker x, y</dt><dd id="kAnchor">–</dd>
         <dt>Varighet</dt><dd id="kDur">–</dd>
+        <dt>Form</dt><dd id="kXf">–</dd>
       </dl>
       <div class="nudge" aria-label="Flytt anker">
         <span class="c"></span><button class="btn" type="button" data-n="0,-1" aria-label="Anker opp">↑</button><span class="c"></span>
@@ -174,6 +193,20 @@ textarea#jsonOut { width: 100%; height: 120px; background: #0d0e16; color: var(-
       <div class="row2">
         <button class="btn small" id="anchorFromPrev" type="button">Anker fra forrige</button>
         <button class="btn small" id="anchorToAll" type="button">Anker til alle</button>
+      </div>
+      <h2 style="margin-top:10px">Flytt, roter og skaler</h2>
+      <div class="xf">
+        <label for="xfX">Flytt x (px)</label><input id="xfX" type="number" step="1">
+        <label for="xfY">Flytt y (px)</label><input id="xfY" type="number" step="1">
+        <label for="xfR">Rotasjon (°)</label><input id="xfR" type="number" step="0.5" min="-180" max="180">
+        <span></span><input id="xfRr" type="range" min="-180" max="180" step="0.5" aria-label="Rotasjon">
+        <label for="xfS">Skala (%)</label><input id="xfS" type="number" step="1" min="10" max="400">
+        <label for="xfF">Speilvend</label><span><input id="xfF" type="checkbox"></span>
+      </div>
+      <div class="row2">
+        <button class="btn small" id="xfReset" type="button">Nullstill form</button>
+        <button class="btn small" id="xfFromPrev" type="button">Form fra forrige</button>
+        <button class="btn small" id="xfToAll" type="button">Form til alle</button>
       </div>
       <div class="row2">
         <label class="inline" for="durAll">Varighet alle (ms)</label>
@@ -198,7 +231,9 @@ textarea#jsonOut { width: 100%; height: 120px; background: #0d0e16; color: var(-
       <h2>Slik gjør du</h2>
       Klikk på bekkenet til ekornet i hvert bilde. I visningen «Justert etter anker» står ankeret alltid i krysset, så når alle bilder er riktige, står kroppen stille mens du blar.
       Løkspeilet viser et annet bilde svakt bak, så du kan treffe samme punkt.<br><br>
-      <kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd> flytt ankeret 1 px (<kbd>Shift</kbd> = 5 px) ·
+      Verktøyene <b>Flytt</b>, <b>Roter</b> og <b>Skaler</b> endrer selve figuren. Roteringen skjer rundt ankeret. Den stiplede ruta er det som kommer med i appen. Kryss av «Alle bilder i klippet» for å endre hele klippet på én gang.<br><br>
+      <kbd>A</kbd> <kbd>V</kbd> <kbd>R</kbd> <kbd>S</kbd> velg verktøy · <kbd>Q</kbd> <kbd>E</kbd> roter 1° (<kbd>Shift</kbd> = 5°) · <kbd>+</kbd> <kbd>−</kbd> skala 1 % · <kbd>H</kbd> speilvend · <kbd>Ctrl</kbd>+<kbd>Z</kbd> angre.<br>
+      <kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd> flytt ankeret (med Flytt-verktøyet: figuren) 1 px (<kbd>Shift</kbd> = 5 px) ·
       <kbd>,</kbd> <kbd>.</kbd> forrige/neste bilde · <kbd>Mellomrom</kbd> spill/stopp.<br><br>
       Varigheten per bilde gjelder i appen som rytme: for løp og klatring styrer kadensen den samlede farten, og varighetene bestemmer hvilke bilder som vises lenger.
     </div>
@@ -243,11 +278,43 @@ textarea#jsonOut { width: 100%; height: 120px; background: #0d0e16; color: var(-
       ay: e.ay ?? f.anchor?.y ?? f.h / 2,
       d: e.d ?? f.durationMs ?? Math.round(1000 / (c.fps || 10)),
       set: e.ax != null || f.anchor != null,
+      // Form: flytting (rutens px), rotasjon (grader, med klokka, rundt ankeret), skala og speilvending
+      tx: e.tx ?? f.transform?.x ?? 0,
+      ty: e.ty ?? f.transform?.y ?? 0,
+      rot: e.rot ?? f.transform?.rotation ?? 0,
+      sc: e.sc ?? f.transform?.scale ?? 1,
+      fx: e.fx ?? f.transform?.flipX ?? false,
     };
   }
-  function edit(name, i, patch) {
+  const hasXf = (fd) => fd.tx || fd.ty || fd.rot || fd.sc !== 1 || fd.fx;
+  // Tegner bildet med ankeret i (cx, cy) og formen brukt. s = skjermpiksler per rutepiksel.
+  function drawXf(g, fd, cx, cy, s, alpha = 1, outline = null) {
+    g.save();
+    g.globalAlpha = alpha;
+    g.translate(cx + fd.tx * s, cy + fd.ty * s);
+    g.rotate(fd.rot * Math.PI / 180);
+    g.scale(fd.sc * (fd.fx ? -1 : 1), fd.sc);
+    g.drawImage(fd.sheet, fd.f.x, fd.f.y, fd.f.w, fd.f.h, -fd.ax * s, -fd.ay * s, fd.f.w * s, fd.f.h * s);
+    if (outline) { g.strokeStyle = outline; g.lineWidth = 2 / fd.sc; g.strokeRect(-fd.ax * s, -fd.ay * s, fd.f.w * s, fd.f.h * s); }
+    g.restore();
+  }
+  // Angre / gjør om
+  const undoStack = [], redoStack = [];
+  function snap() {
+    undoStack.push(JSON.stringify(edits));
+    if (undoStack.length > 300) undoStack.shift();
+    redoStack.length = 0; updateUndo();
+  }
+  function updateUndo() { $("undoBtn").disabled = !undoStack.length; $("redoBtn").disabled = !redoStack.length; }
+  function undo() { if (!undoStack.length) return; redoStack.push(JSON.stringify(edits)); edits = JSON.parse(undoStack.pop()); lsSet(packKey, edits); updateUndo(); refreshAll(); setStatus("Angret."); }
+  function redo() { if (!redoStack.length) return; undoStack.push(JSON.stringify(edits)); edits = JSON.parse(redoStack.pop()); lsSet(packKey, edits); updateUndo(); refreshAll(); setStatus("Gjort om."); }
+  function setRaw(name, i, patch) {
     edits[name] = edits[name] || [];
     edits[name][i] = Object.assign({}, edits[name][i] || {}, patch);
+  }
+  function edit(name, i, patch, opts = {}) {
+    if (!opts.noSnap) snap();
+    setRaw(name, i, patch);
     lsSet(packKey, edits);
     refreshAll();
   }
@@ -265,6 +332,7 @@ textarea#jsonOut { width: 100%; height: 120px; background: #0d0e16; color: var(-
     }
     packKey = name;
     edits = lsGet(packKey) || {};
+    undoStack.length = 0; redoStack.length = 0; updateUndo();
     clipNames = Object.keys(meta.clips);
     clipName = clipNames[0];
     frameIdx = 0;
@@ -383,8 +451,9 @@ textarea#jsonOut { width: 100%; height: 120px; background: #0d0e16; color: var(-
       const c = card.querySelector("canvas"), g = c.getContext("2d");
       g.clearRect(0, 0, c.width, c.height);
       const s = c.width / Math.max(fd.f.w, fd.f.h);
-      g.drawImage(fd.sheet, fd.f.x, fd.f.y, fd.f.w, fd.f.h, 0, 0, fd.f.w * s, fd.f.h * s);
-      g.fillStyle = "#f2c14e"; g.beginPath(); g.arc(fd.ax * s, fd.ay * s, 3, 0, Math.PI * 2); g.fill();
+      g.imageSmoothingEnabled = true;
+      drawXf(g, fd, c.width / 2, c.height / 2, s);
+      g.fillStyle = "#f2c14e"; g.beginPath(); g.arc(c.width / 2 + fd.tx * s, c.height / 2 + fd.ty * s, 3, 0, Math.PI * 2); g.fill();
     });
   }
 
@@ -420,40 +489,112 @@ textarea#jsonOut { width: 100%; height: 120px; background: #0d0e16; color: var(-
     eg.imageSmoothingEnabled = true;
     checker(eg, ed.width, ed.height, 32);
     const on = onionFrame();
+    const cx = ed.width / 2, cy = ed.height / 2;
     if (on) {
-      const zo = (ed.width * 0.6 / Math.max(fd.f.w, fd.f.h)) * +$("zoom").value * (Math.max(fd.f.w, fd.f.h) / Math.max(on.f.w, on.f.h));
-      const [ox, oy] = view === "aligned" ? [ed.width / 2 - on.ax * zo, ed.height / 2 - on.ay * zo] : [ed.width / 2 - on.f.w * zo / 2, ed.height / 2 - on.f.h * zo / 2];
-      eg.globalAlpha = 0.3;
-      eg.drawImage(on.sheet, on.f.x, on.f.y, on.f.w, on.f.h, ox, oy, on.f.w * zo, on.f.h * zo);
-      eg.globalAlpha = 1;
+      const zo = z * (Math.max(fd.f.w, fd.f.h) / Math.max(on.f.w, on.f.h));
+      if (view === "aligned") drawXf(eg, on, cx, cy, zo, 0.3);
+      else { eg.globalAlpha = 0.3; eg.drawImage(on.sheet, on.f.x, on.f.y, on.f.w, on.f.h, cx - on.f.w * zo / 2, cy - on.f.h * zo / 2, on.f.w * zo, on.f.h * zo); eg.globalAlpha = 1; }
     }
-    const [x, y] = placeFor(fd, z);
-    eg.strokeStyle = "rgba(255,255,255,.12)"; eg.lineWidth = 2;
-    eg.strokeRect(x, y, fd.f.w * z, fd.f.h * z);
-    eg.drawImage(fd.sheet, fd.f.x, fd.f.y, fd.f.w, fd.f.h, x, y, fd.f.w * z, fd.f.h * z);
+    let ax, ay;
+    if (view === "aligned") {
+      // Det som kommer med i appen: kvadrat med ankeret i midten
+      const side = Math.max(fd.f.w, fd.f.h) * z;
+      eg.save(); eg.setLineDash([10, 8]); eg.strokeStyle = "rgba(145,132,217,.7)"; eg.lineWidth = 2;
+      eg.strokeRect(cx - side / 2, cy - side / 2, side, side); eg.restore();
+      eg.strokeStyle = "rgba(255,255,255,.18)"; eg.lineWidth = 1;
+      eg.beginPath(); eg.moveTo(cx, cy - side / 2); eg.lineTo(cx, cy + side / 2); eg.moveTo(cx - side / 2, cy); eg.lineTo(cx + side / 2, cy); eg.stroke();
+      drawXf(eg, fd, cx, cy, z, 1, "rgba(255,255,255,.14)");
+      ax = cx + fd.tx * z; ay = cy + fd.ty * z;
+    } else {
+      const [x, y] = placeFor(fd, z);
+      eg.strokeStyle = "rgba(255,255,255,.12)"; eg.lineWidth = 2;
+      eg.strokeRect(x, y, fd.f.w * z, fd.f.h * z);
+      eg.drawImage(fd.sheet, fd.f.x, fd.f.y, fd.f.w, fd.f.h, x, y, fd.f.w * z, fd.f.h * z);
+      ax = x + fd.ax * z; ay = y + fd.ay * z;
+    }
     // Anker: kryss over hele lerretet + ring
-    const ax = x + fd.ax * z, ay = y + fd.ay * z;
     eg.strokeStyle = "rgba(242,193,78,.55)"; eg.lineWidth = 2;
     eg.beginPath(); eg.moveTo(ax, 0); eg.lineTo(ax, ed.height); eg.moveTo(0, ay); eg.lineTo(ed.width, ay); eg.stroke();
     eg.strokeStyle = "#f2c14e"; eg.lineWidth = 3;
     eg.beginPath(); eg.arc(ax, ay, 12, 0, Math.PI * 2); eg.stroke();
     eg.fillStyle = "#f2c14e"; eg.beginPath(); eg.arc(ax, ay, 3.5, 0, Math.PI * 2); eg.fill();
   }
-  ed.addEventListener("pointerdown", (e) => {
+  let tool = "anchor", drag = null;
+  function setTool(t) {
+    tool = t;
+    document.querySelectorAll("[data-tool]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.tool === t));
+    ed.style.cursor = { anchor: "crosshair", move: "move", rotate: "grab", scale: "nwse-resize" }[t];
+    if (t !== "anchor" && view !== "aligned") $("viewAligned").click();
+  }
+  document.querySelectorAll("[data-tool]").forEach((b) => b.addEventListener("click", () => setTool(b.dataset.tool)));
+  const targets = () => $("allFrames").checked ? frames().map((_, i) => i) : [frameIdx];
+  function canvasPt(e) {
     const r = ed.getBoundingClientRect();
-    const px = (e.clientX - r.left) * ed.width / r.width;
-    const py = (e.clientY - r.top) * ed.height / r.height;
+    return [(e.clientX - r.left) * ed.width / r.width, (e.clientY - r.top) * ed.height / r.height];
+  }
+  // Fra lerretet til rutens piksler (tar hensyn til formen i justert visning)
+  function toCell(fd, px, py) {
+    const z = editorScale(fd);
+    if (view !== "aligned") { const [x, y] = placeFor(fd, z); return [(px - x) / z, (py - y) / z]; }
+    let ux = (px - ed.width / 2) / z - fd.tx, uy = (py - ed.height / 2) / z - fd.ty;
+    const a = -fd.rot * Math.PI / 180, c = Math.cos(a), s = Math.sin(a);
+    const vx = c * ux - s * uy, vy = s * ux + c * uy;
+    return [fd.ax + vx / (fd.sc * (fd.fx ? -1 : 1)), fd.ay + vy / fd.sc];
+  }
+  ed.addEventListener("pointerdown", (e) => {
+    if (!meta) return;
+    const [px, py] = canvasPt(e);
     const fd = frameData(clipName, frameIdx);
     const z = editorScale(fd);
-    const [x, y] = placeFor(fd, z);
-    const ax = Math.round((px - x) / z), ay = Math.round((py - y) / z);
-    if (ax < 0 || ay < 0 || ax > fd.f.w || ay > fd.f.h) { setStatus("Klikk innenfor ruten.", "warn"); return; }
-    edit(clipName, frameIdx, { ax, ay });
-    setStatus(`Anker for bilde ${frameIdx + 1} satt til ${ax}, ${ay}.`);
+    if (tool === "anchor") {
+      let [ax, ay] = toCell(fd, px, py);
+      ax = Math.round(ax); ay = Math.round(ay);
+      if (ax < 0 || ay < 0 || ax > fd.f.w || ay > fd.f.h) { setStatus("Klikk innenfor ruten.", "warn"); return; }
+      edit(clipName, frameIdx, { ax, ay });
+      setStatus(`Anker for bilde ${frameIdx + 1} satt til ${ax}, ${ay}.`);
+      return;
+    }
+    snap();
+    const pivot = [ed.width / 2 + fd.tx * z, ed.height / 2 + fd.ty * z];
+    drag = { px, py, z, pivot, start: targets().map((i) => [i, frameData(clipName, i)]),
+      a0: Math.atan2(py - pivot[1], px - pivot[0]), d0: Math.max(8, Math.hypot(px - pivot[0], py - pivot[1])) };
+    ed.setPointerCapture(e.pointerId);
+    if (tool === "rotate") ed.style.cursor = "grabbing";
   });
+  ed.addEventListener("pointermove", (e) => {
+    if (!drag) return;
+    const [px, py] = canvasPt(e);
+    const { z, pivot } = drag;
+    for (const [i, f0] of drag.start) {
+      if (tool === "move") setRaw(clipName, i, { tx: round1(f0.tx + (px - drag.px) / z), ty: round1(f0.ty + (py - drag.py) / z) });
+      else if (tool === "rotate") {
+        let d = (Math.atan2(py - pivot[1], px - pivot[0]) - drag.a0) * 180 / Math.PI;
+        let r = f0.rot + d; if (e.shiftKey) r = Math.round(r / 15) * 15;
+        setRaw(clipName, i, { rot: round1(wrapDeg(r)) });
+      } else if (tool === "scale") {
+        const k = Math.max(8, Math.hypot(px - pivot[0], py - pivot[1])) / drag.d0;
+        setRaw(clipName, i, { sc: Math.round(Math.min(4, Math.max(0.1, f0.sc * k)) * 1000) / 1000 });
+      }
+    }
+    drawEditor(); updateInfo();
+  });
+  const endDrag = () => { if (!drag) return; drag = null; setTool(tool); lsSet(packKey, edits); refreshAll(); };
+  ed.addEventListener("pointerup", endDrag); ed.addEventListener("pointercancel", endDrag);
+  const round1 = (v) => Math.round(v * 10) / 10;
+  const wrapDeg = (r) => ((r + 180) % 360 + 360) % 360 - 180;
   function nudge(dx, dy) {
+    if (tool === "move") {
+      snap();
+      for (const i of targets()) { const fd = frameData(clipName, i); setRaw(clipName, i, { tx: round1(fd.tx + dx), ty: round1(fd.ty + dy) }); }
+      lsSet(packKey, edits); refreshAll(); return;
+    }
     const fd = frameData(clipName, frameIdx);
     edit(clipName, frameIdx, { ax: Math.round(fd.ax + dx), ay: Math.round(fd.ay + dy) });
+  }
+  function xfAll(fn) {
+    snap();
+    for (const i of targets()) setRaw(clipName, i, fn(frameData(clipName, i)));
+    lsSet(packKey, edits); refreshAll();
   }
 
   // ---------- Preview (64 dp ≈ 192 px, som i appen) ----------
@@ -473,10 +614,7 @@ textarea#jsonOut { width: 100%; height: 120px; background: #0d0e16; color: var(-
   }
   function drawFrameTo(g, size, name, i, alpha) {
     const fd = frameData(name, i);
-    const s = size / Math.max(fd.f.w, fd.f.h);
-    g.globalAlpha = alpha;
-    g.drawImage(fd.sheet, fd.f.x, fd.f.y, fd.f.w, fd.f.h, size / 2 - fd.ax * s, size / 2 - fd.ay * s, fd.f.w * s, fd.f.h * s);
-    g.globalAlpha = 1;
+    drawXf(g, fd, size / 2, size / 2, size / Math.max(fd.f.w, fd.f.h), alpha);
   }
   function drawPreview(name, i, blendNext) {
     pg.clearRect(0, 0, pv.width, pv.height);
@@ -622,10 +760,12 @@ textarea#jsonOut { width: 100%; height: 120px; background: #0d0e16; color: var(-
     }
   }
   $("autoClip").onclick = () => {
+    snap();
     const drift = autoTrack(clipName); normCache.clear(); jumpReport = analyse(clipName); refreshAll(); showFindings([jumpReport]);
     setStatus(`Auto-anker for ${clipName} er ferdig` + (drift > 1 ? ` (rettet ${drift.toFixed(0)} px drift over runden).` : "."), "ok");
   };
   $("autoAll").onclick = () => {
+    snap();
     const loops = clipNames.filter((n) => meta.clips[n].loop), trans = clipNames.filter((n) => !meta.clips[n].loop);
     [...loops, ...trans].forEach((n) => autoTrack(n));
     normCache.clear();
@@ -643,6 +783,10 @@ textarea#jsonOut { width: 100%; height: 120px; background: #0d0e16; color: var(-
     $("kFrame").textContent = `${frameIdx + 1} av ${frames().length}`;
     $("kAnchor").textContent = `${Math.round(fd.ax)}, ${Math.round(fd.ay)}${fd.set ? "" : " (midten)"}`;
     $("kDur").textContent = fd.d + " ms";
+    $("kXf").textContent = hasXf(fd) ? `${round1(fd.tx)}, ${round1(fd.ty)} · ${round1(fd.rot)}° · ${Math.round(fd.sc * 100)} %${fd.fx ? " · speilet" : ""}` : "ingen";
+    const setIf = (id, v) => { if (document.activeElement !== $(id)) $(id).value = v; };
+    setIf("xfX", round1(fd.tx)); setIf("xfY", round1(fd.ty)); setIf("xfR", round1(fd.rot)); setIf("xfRr", round1(fd.rot));
+    setIf("xfS", Math.round(fd.sc * 1000) / 10); $("xfF").checked = !!fd.fx;
   }
   function exportJson() {
     const out = JSON.parse(JSON.stringify(meta));
@@ -652,6 +796,8 @@ textarea#jsonOut { width: 100%; height: 120px; background: #0d0e16; color: var(-
         const fd = frameData(n, i);
         f.anchor = { x: Math.round(fd.ax), y: Math.round(fd.ay) };
         f.durationMs = fd.d;
+        if (hasXf(fd)) f.transform = { x: round1(fd.tx), y: round1(fd.ty), rotation: round1(fd.rot), scale: Math.round(fd.sc * 1000) / 1000, flipX: !!fd.fx };
+        else delete f.transform;
       });
     }
     return JSON.stringify(out, null, 2);
@@ -674,21 +820,57 @@ textarea#jsonOut { width: 100%; height: 120px; background: #0d0e16; color: var(-
   $("viewRaw").onclick = () => { view = "raw"; $("viewRaw").setAttribute("aria-pressed", true); $("viewAligned").setAttribute("aria-pressed", false); drawEditor(); };
   $("onion").onchange = drawEditor; $("zoom").onchange = drawEditor; $("chain").onchange = () => { seq = null; seqPos = 0; };
   document.querySelectorAll("[data-n]").forEach((b) => b.addEventListener("click", () => { const [dx, dy] = b.dataset.n.split(",").map(Number); nudge(dx, dy); }));
-  $("resetAnchor").onclick = () => { if (edits[clipName]?.[frameIdx]) { delete edits[clipName][frameIdx].ax; delete edits[clipName][frameIdx].ay; lsSet(packKey, edits); refreshAll(); } };
+  $("resetAnchor").onclick = () => { if (edits[clipName]?.[frameIdx]) { snap(); delete edits[clipName][frameIdx].ax; delete edits[clipName][frameIdx].ay; lsSet(packKey, edits); refreshAll(); } };
   $("anchorFromPrev").onclick = () => { if (frameIdx > 0) { const p = frameData(clipName, frameIdx - 1); edit(clipName, frameIdx, { ax: p.ax, ay: p.ay }); } };
   $("anchorToAll").onclick = () => {
     const p = frameData(clipName, frameIdx);
+    snap();
     frames().forEach((_, i) => { edits[clipName] = edits[clipName] || []; edits[clipName][i] = Object.assign({}, edits[clipName][i], { ax: p.ax, ay: p.ay }); });
     lsSet(packKey, edits); refreshAll(); setStatus("Ankeret er kopiert til alle bildene i " + clipName + ". Juster bildene som avviker.");
   };
   $("durAllBtn").onclick = () => {
     const v = Math.max(10, Math.min(2000, Math.round(+$("durAll").value || 0)));
     if (!v) return;
+    snap();
     frames().forEach((_, i) => { edits[clipName] = edits[clipName] || []; edits[clipName][i] = Object.assign({}, edits[clipName][i], { d: v }); });
     lsSet(packKey, edits); refreshAll(); setStatus(`Alle bildene i ${clipName} varer nå ${v} ms.`);
   };
+  // Tallfelt: settes på valgte bilde(r). Med «Alle bilder» flyttes alle like mye (relativt).
+  const numIn = (id, key, conv = (v) => v) => $(id).addEventListener("change", () => {
+    const v = conv(+$(id).value); if (!isFinite(v)) return;
+    const cur = frameData(clipName, frameIdx)[key];
+    xfAll((fd) => ({ [key]: key === "sc" ? Math.max(0.1, Math.min(4, fd.sc * v / (cur || 1))) : (key === "rot" ? wrapDeg(fd.rot + v - cur) : fd[key] + v - cur) }));
+  });
+  numIn("xfX", "tx"); numIn("xfY", "ty"); numIn("xfR", "rot"); numIn("xfS", "sc", (v) => v / 100);
+  $("xfRr").addEventListener("input", () => { $("xfR").value = $("xfRr").value; });
+  $("xfRr").addEventListener("change", () => { $("xfR").dispatchEvent(new Event("change")); });
+  $("xfF").addEventListener("change", () => { const on = $("xfF").checked; xfAll(() => ({ fx: on })); });
+  $("xfReset").onclick = () => xfAll(() => ({ tx: 0, ty: 0, rot: 0, sc: 1, fx: false }));
+  $("xfFromPrev").onclick = () => {
+    const n = frames().length; const j = frameIdx > 0 ? frameIdx - 1 : (clip().loop ? n - 1 : -1);
+    if (j < 0) return; const p = frameData(clipName, j);
+    edit(clipName, frameIdx, { tx: p.tx, ty: p.ty, rot: p.rot, sc: p.sc, fx: p.fx });
+  };
+  $("xfToAll").onclick = () => {
+    const p = frameData(clipName, frameIdx); snap();
+    frames().forEach((_, i) => setRaw(clipName, i, { tx: p.tx, ty: p.ty, rot: p.rot, sc: p.sc, fx: p.fx }));
+    lsSet(packKey, edits); refreshAll(); setStatus("Formen er kopiert til alle bildene i " + clipName + ".");
+  };
+  $("undoBtn").onclick = undo; $("redoBtn").onclick = redo;
   document.addEventListener("keydown", (e) => {
-    if (!meta || ["INPUT", "SELECT", "TEXTAREA"].includes(document.activeElement.tagName)) return;
+    if (!meta) return;
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") { e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "y") { e.preventDefault(); redo(); return; }
+    if (["INPUT", "SELECT", "TEXTAREA"].includes(document.activeElement.tagName) && document.activeElement.type !== "checkbox") return;
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    const k = e.key.toLowerCase();
+    if (k === "a") return setTool("anchor");
+    if (k === "v") return setTool("move");
+    if (k === "r") return setTool("rotate");
+    if (k === "s") return setTool("scale");
+    if (k === "h") return xfAll((fd) => ({ fx: !fd.fx }));
+    if (k === "q" || k === "e") { const d = (e.shiftKey ? 5 : 1) * (k === "q" ? -1 : 1); return xfAll((fd) => ({ rot: wrapDeg(round1(fd.rot + d)) })); }
+    if (e.key === "+" || e.key === "=" || e.key === "-") { const d = e.key === "-" ? -0.01 : 0.01; return xfAll((fd) => ({ sc: Math.max(0.1, Math.min(4, Math.round((fd.sc + d) * 1000) / 1000)) })); }
     const step = e.shiftKey ? 5 : 1;
     const map = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] };
     if (map[e.key]) { e.preventDefault(); nudge(...map[e.key]); }
