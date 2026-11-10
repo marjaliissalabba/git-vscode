@@ -1,5 +1,8 @@
 package no.spinapp.ui
 
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -12,6 +15,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -27,26 +31,23 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import no.spinapp.core.TargetStatus
 import no.spinapp.core.Zone
-import kotlin.math.cos
 import kotlin.math.min
 import kotlin.math.roundToInt
-import kotlin.math.sin
 
-private const val START_ANGLE = 135f
-private const val SWEEP = 270f
-
-val StatusGood = Color(0xFF2EE07A)
-val StatusBad = Color(0xFFE74C3C)
+private const val START = 130f   // −140° fra toppen
+private const val SWEEP = 280f
+private const val MAX_PCT = 160f
 
 fun statusColor(s: TargetStatus) = when (s) {
-    TargetStatus.IN_RANGE -> StatusGood
-    TargetStatus.NO_DATA -> Color.Gray
-    else -> StatusBad
+    TargetStatus.IN_RANGE -> C.good
+    TargetStatus.NO_DATA -> C.n500
+    TargetStatus.LOW -> C.bad
+    TargetStatus.HIGH -> C.warn
 }
 
 /**
- * Rund måler: tynn bue med sonefarger (% av FTP), hvit bue utenfor = målet,
- * hvit pil = deg. I midten: %, watt, sone og kadens.
+ * Måleren: 280° bue for 0–160 % FTP med 8 sonesegmenter. Segmentet du er i er tykkere,
+ * målområdet vises som et hvitt bånd utenfor, og en hvit pil viser hvor du er.
  */
 @Composable
 fun PowerGauge(
@@ -61,103 +62,59 @@ fun PowerGauge(
     modifier: Modifier = Modifier,
 ) {
     val pct: Double? = powerW?.let { it * 100.0 / ftp }
-    val maxPct = maxOf(160f, (targetHighPct ?: 0) + 20f)
     val zone = pct?.let { Zone.forPct(it) }
+    val pointer by animateFloatAsState(
+        targetValue = (pct ?: 0.0).toFloat().coerceIn(0f, MAX_PCT),
+        animationSpec = tween(500, easing = FastOutSlowInEasing), label = "pil",
+    )
 
     BoxWithConstraints(modifier, contentAlignment = Alignment.Center) {
         val side = min(maxWidth.value, maxHeight.value).dp
-        val scale = side.value / 340f
+        val k = side.value / 300f
 
         Canvas(Modifier.size(side)) {
-            val stroke = size.minDimension * 0.022f
-            val pad = size.minDimension * 0.06f
-            val topLeft = Offset(pad, pad)
-            val arcSize = Size(size.width - pad * 2, size.height - pad * 2)
-            val radius = arcSize.width / 2
+            val u = size.minDimension / 300f          // 128 px radius i en 300 px boks
+            val r = 128f * u
+            val thin = 6f * u
+            val thick = 11f * u
+            fun ang(p: Float) = START + p.coerceIn(0f, MAX_PCT) / MAX_PCT * SWEEP
+            fun box(rad: Float) = Offset(center.x - rad, center.y - rad) to Size(rad * 2, rad * 2)
 
-            fun angle(p: Float) = START_ANGLE + (p.coerceIn(0f, maxPct) / maxPct) * SWEEP
-            fun point(deg: Float, r: Float): Offset {
-                val a = Math.toRadians(deg.toDouble())
-                return Offset(center.x + (r * cos(a)).toFloat(), center.y + (r * sin(a)).toFloat())
-            }
-
-            // Sonebuer med små mellomrom
-            val zones = Zone.entries.filter { it.lowPct < maxPct }
-            zones.forEachIndexed { i, z ->
-                val from = angle(z.lowPct.toFloat())
-                val to = angle(minOf(z.highPct + 1f, maxPct))
-                val gap = 0.9f
+            val (tl, sz) = box(r)
+            Zone.entries.forEach { z ->
+                val from = z.lowPct.toFloat().coerceAtMost(MAX_PCT)
+                val to = min(z.highPct + 1f, MAX_PCT)
+                if (to <= from) return@forEach
+                val active = z == zone
                 drawArc(
-                    color = Color(z.argb),
-                    startAngle = from + if (i == 0) 0f else gap,
-                    sweepAngle = to - from - (if (i == 0) 0f else gap) - (if (i == zones.lastIndex) 0f else gap),
-                    useCenter = false,
-                    topLeft = topLeft,
-                    size = arcSize,
-                    style = Stroke(width = stroke, cap = StrokeCap.Butt),
+                    Color(z.argb).copy(alpha = if (active || zone == null) 1f else 0.8f),
+                    ang(from) + 0.6f, ang(to) - ang(from) - 1.2f, false, tl, sz,
+                    style = Stroke(if (active) thick else thin, cap = StrokeCap.Butt),
                 )
             }
-            // Runde ender
-            drawCircle(Color(zones.first().argb), stroke / 2, point(START_ANGLE, radius))
-            drawCircle(Color(zones.last().argb), stroke / 2, point(START_ANGLE + SWEEP, radius))
-
-            // Målet: hvit bue utenfor
             if (targetLowPct != null && targetHighPct != null) {
-                val off = stroke * 2.4f
-                val a0 = angle(targetLowPct.toFloat())
-                val a1 = angle(targetHighPct.toFloat())
-                drawArc(
-                    color = Color.White,
-                    startAngle = a0,
-                    sweepAngle = (a1 - a0).coerceAtLeast(2f),
-                    useCenter = false,
-                    topLeft = topLeft - Offset(off, off),
-                    size = Size(arcSize.width + off * 2, arcSize.height + off * 2),
-                    style = Stroke(width = stroke * 1.3f, cap = StrokeCap.Round),
-                )
+                val (tl2, sz2) = box(141f * u)
+                val a0 = ang(targetLowPct.toFloat())
+                drawArc(C.n100, a0, (ang(targetHighPct.toFloat()) - a0).coerceAtLeast(1.5f), false, tl2, sz2,
+                    style = Stroke(5f * u, cap = StrokeCap.Round))
             }
-
-            // Pil innenfor buen, peker ut mot nåværende %
-            if (pct != null) {
-                drawPointer(angle(pct.toFloat()), radius - stroke * 1.6f, size.minDimension * 0.07f)
-            }
+            if (pct != null) drawPointer(ang(pointer), r - 16f * u, 20f * u)
         }
 
-        // Midten
-        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(top = side * 0.04f)) {
-            Text(
-                text = pct?.let { "${it.roundToInt()}%" } ?: "–",
-                fontSize = (84 * scale).sp, fontWeight = FontWeight.Bold, color = Color.White,
-                lineHeight = (88 * scale).sp,
-            )
-            Text(
-                text = "${powerW ?: "–"} W",
-                fontSize = (34 * scale).sp, fontWeight = FontWeight.Bold, color = Color.White,
-            )
-            Text(
-                text = zone?.label ?: "av FTP",
-                fontSize = (20 * scale).sp, fontWeight = FontWeight.Medium,
-                color = zone?.let { Color(it.argb) } ?: Color.Gray,
-            )
-            Box(
-                Modifier
-                    .padding(vertical = (10 * scale).dp)
-                    .width((26 * scale).dp)
-                    .height(1.dp)
-                    .background(Color.Gray)
-            )
+        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(top = side * 0.03f)) {
+            Text(pct?.let { "${it.roundToInt()}%" } ?: "–", color = C.n100, fontSize = (64 * k).sp,
+                fontWeight = FontWeight.SemiBold, fontFamily = Inter, lineHeight = (68 * k).sp)
+            Text("${powerW ?: "–"} W", color = C.n100, fontSize = (24 * k).sp, fontWeight = FontWeight.SemiBold, fontFamily = Inter)
+            Text(zone?.short ?: "av FTP", color = zone?.let { Color(it.argb) } ?: C.n500, fontSize = (16 * k).sp, fontFamily = Inter)
+            Box(Modifier.padding(vertical = (8 * k).dp).width((26 * k).dp).height(1.dp).background(C.n600))
+            val off = cadenceStatus == TargetStatus.LOW || cadenceStatus == TargetStatus.HIGH
             Row(verticalAlignment = Alignment.Bottom) {
-                Text(
-                    "${cadence ?: "–"}",
-                    fontSize = (44 * scale).sp, fontWeight = FontWeight.Bold, color = statusColor(cadenceStatus),
-                )
-                Text(
-                    " rpm", fontSize = (24 * scale).sp, color = Color.LightGray,
-                    modifier = Modifier.padding(bottom = (7 * scale).dp),
-                )
+                Text("${cadence ?: "–"}", color = if (off) C.warn else C.n100, fontSize = (34 * k).sp,
+                    fontWeight = FontWeight.SemiBold, fontFamily = Inter)
+                Text(" rpm", color = C.n400, fontSize = (16 * k).sp, fontFamily = Inter, modifier = Modifier.padding(bottom = (5 * k).dp))
             }
             if (cadenceLow != null && cadenceHigh != null) {
-                Text("mål $cadenceLow–$cadenceHigh", fontSize = (19 * scale).sp, color = Color.LightGray)
+                Text("mål $cadenceLow–$cadenceHigh", color = C.n400, fontSize = (14 * k).sp, fontFamily = Inter)
             }
         }
     }
@@ -165,16 +122,14 @@ fun PowerGauge(
 
 private fun DrawScope.drawPointer(angleDeg: Float, radius: Float, len: Float) {
     rotate(angleDeg, pivot = center) {
-        // Tegnet mot høyre (0°) og rotert til riktig vinkel. Spissen peker ut mot buen.
         val tipX = center.x + radius
         val baseX = tipX - len
         val path = Path().apply {
             moveTo(tipX, center.y)
-            lineTo(baseX, center.y - len * 0.38f)
-            lineTo(baseX + len * 0.18f, center.y)
-            lineTo(baseX, center.y + len * 0.38f)
+            lineTo(baseX, center.y - len * 0.42f)
+            lineTo(baseX, center.y + len * 0.42f)
             close()
         }
-        drawPath(path, Color.White)
+        drawPath(path, C.n100)
     }
 }

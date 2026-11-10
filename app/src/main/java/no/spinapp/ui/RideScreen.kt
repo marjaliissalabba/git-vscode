@@ -1,5 +1,7 @@
 package no.spinapp.ui
 
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.border
 import android.content.Context
 import android.media.AudioManager
 import android.media.ToneGenerator
@@ -9,6 +11,17 @@ import android.os.Vibrator
 import android.os.VibratorManager
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -65,6 +78,7 @@ fun formatTime(sec: Int): String {
     else String.format(Locale.ROOT, "%d:%02d", s / 60, s % 60)
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RideScreen(activity: MainActivity, workout: Workout, onFinished: (RideSummary?) -> Unit) {
     val context = LocalContext.current
@@ -180,87 +194,131 @@ fun RideScreen(activity: MainActivity, workout: Workout, onFinished: (RideSummar
     }
 
     val seg = state.segment
-    val zoneColor = seg?.let { Color(it.zone.argb) } ?: Color.DarkGray
+    val zoneColor = seg?.let { Color(it.zone.argb) } ?: C.n700
+    var endSheet by remember { mutableStateOf(false) }
+    var pausedBeforeEnd by remember { mutableStateOf(true) }
+    fun refresh() { state = session.state(source?.freshSample()) }
+
+    // Sangen som spilles (Spotify App Remote, ellers avspillingskontrollen)
+    val remoteNow by no.spinapp.SpotifyRemote.nowPlaying.collectAsState()
+    var sessionNow by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(spotifyOn) {
+        while (spotifyOn) { sessionNow = no.spinapp.SpotifySession.nowPlaying(context); delay(3000) }
+    }
+    val nowPlaying = remoteNow ?: sessionNow
 
     Column(
         Modifier
             .fillMaxSize()
-            .background(Color(0xFF0B0E11))
+            .background(Brush.radialGradient(listOf(Color(0xFF22243A), C.bg), center = Offset(540f, 1300f), radius = 1100f))
             .statusBarsPadding()
             .navigationBarsPadding()
-            .padding(horizontal = 12.dp, vertical = 8.dp),
+            .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        // Topp: økt, intervallnavn og total tid
-        Row(verticalAlignment = Alignment.Bottom) {
-            Column(Modifier.weight(1f)) {
-                Text(workout.name, fontSize = 17.sp, color = Color.White)
-                Text(
-                    seg?.name ?: "Ferdig", fontSize = 32.sp, fontWeight = FontWeight.Bold, color = zoneColor,
-                    maxLines = 1, lineHeight = 36.sp,
-                )
+        // 1. Statuslinje
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            val sim = source?.type == no.spinapp.core.SourceType.SIMULATOR
+            Row(
+                Modifier.clip(RoundedCornerShape(50)).background(C.n900).border(1.dp, C.n800, RoundedCornerShape(50))
+                    .padding(horizontal = 12.dp, vertical = 6.dp).weight(1f, fill = false),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(Modifier.size(7.dp).clip(CircleShape).background(if (sim) C.accent else C.good))
+                Text(if (sim) "  Simulerer · ingen sykkel" else "  $sourceStatus", color = C.n200, fontSize = 12.sp, fontFamily = Inter, maxLines = 1)
             }
-            Column(horizontalAlignment = Alignment.End) {
-                Text("Igjen av økta", fontSize = 15.sp, color = Color.LightGray)
-                Text(formatTime(state.totalRemainingSec), fontSize = 32.sp, color = Color.White, fontWeight = FontWeight.Medium)
+            Spacer(Modifier.weight(1f))
+            Text("×  Avslutt", Modifier.clip(RoundedCornerShape(8.dp)).clickable {
+                pausedBeforeEnd = paused; paused = true; endSheet = true
+            }.padding(horizontal = 10.dp, vertical = 12.dp), color = C.n400, fontSize = 15.sp, fontFamily = Inter)
+        }
+
+        // 2. Musikk (øverst, langt fra øktknappene)
+        if (spotifyOn) {
+            Row(
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(C.surface).border(1.dp, C.n800, RoundedCornerShape(14.dp))
+                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(Modifier.size(38.dp).clip(RoundedCornerShape(6.dp)).background(C.n900), contentAlignment = Alignment.Center) {
+                    Icon(Ico.Music, C.good, 20.dp)
+                }
+                val parts = nowPlaying?.split(" – ", limit = 2)
+                Column(Modifier.weight(1f).padding(horizontal = 10.dp)) {
+                    Text(parts?.getOrNull(0) ?: "Spotify", color = C.n100, fontSize = 14.sp, fontFamily = Inter, maxLines = 1)
+                    Text(parts?.getOrNull(1) ?: (if (musicPlaying) "Spiller" else "Klar"), color = C.n400, fontSize = 12.sp, fontFamily = Inter, maxLines = 1)
+                }
+                MusicButton("⏮") { no.spinapp.SpotifyControl.previous(context) }
+                Spacer(Modifier.width(6.dp))
+                MusicButton(if (musicPlaying) "⏸" else "▶") {
+                    if (musicPlaying) no.spinapp.SpotifyControl.pause(context) else no.spinapp.SpotifyControl.play(context)
+                    musicPlaying = !musicPlaying
+                }
+                Spacer(Modifier.width(6.dp))
+                MusicButton("⏭") { skipSong() }
             }
         }
 
-        // Intervall-tid og neste intervall
+        // 3. Tittelrad
+        Row(verticalAlignment = Alignment.Bottom) {
+            Column(Modifier.weight(1f)) {
+                Text("${workout.name} · ${(state.segmentIndex + 1).coerceAtMost(workout.segments.size)} av ${workout.segments.size}",
+                    color = C.n400, fontSize = 14.sp, fontFamily = Inter, maxLines = 1)
+                Text(seg?.name ?: "Ferdig", color = zoneColor, fontSize = 30.sp, fontFamily = Inter, fontWeight = FontWeight.Medium,
+                    maxLines = 1, lineHeight = 34.sp)
+            }
+            Column(horizontalAlignment = Alignment.End) {
+                Text("Igjen av økta", color = C.n400, fontSize = 14.sp, fontFamily = Inter)
+                Text(formatTime(state.totalRemainingSec), color = C.n100, fontSize = 30.sp, fontFamily = Inter, fontWeight = FontWeight.Medium, lineHeight = 34.sp)
+            }
+        }
+
+        // 4. Intervallkort
         Row(
-            Modifier
-                .fillMaxWidth()
-                .background(zoneColor.copy(alpha = 0.20f), RoundedCornerShape(20.dp))
-                .padding(horizontal = 18.dp, vertical = 12.dp),
+            Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(zoneColor.copy(alpha = 0.14f))
+                .border(1.dp, C.n800, RoundedCornerShape(14.dp)).padding(horizontal = 14.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(Modifier.weight(1f)) {
-                Text("Dette intervallet", fontSize = 15.sp, color = Color.LightGray)
-                Text(
-                    formatTime(state.segmentRemainingSec),
-                    fontSize = 56.sp, fontWeight = FontWeight.Bold, color = Color.White, lineHeight = 60.sp,
-                )
+                Text("Dette intervallet", color = C.n400, fontSize = 13.sp, fontFamily = Inter)
+                Text(formatTime(state.segmentRemainingSec), color = C.n100, fontSize = 48.sp, fontFamily = Inter, fontWeight = FontWeight.SemiBold, lineHeight = 52.sp)
+                val segFrac = seg?.let { 1f - state.segmentRemainingSec.toFloat() / it.durationSec.coerceAtLeast(1) } ?: 0f
+                Box(Modifier.fillMaxWidth(0.9f).height(4.dp).clip(RoundedCornerShape(2.dp)).background(C.n800)) {
+                    Box(Modifier.fillMaxWidth(segFrac.coerceIn(0f, 1f)).height(4.dp).background(zoneColor))
+                }
+                if (session.inWarmup()) {
+                    Text("Hopp over oppvarming", Modifier.clickable { if (session.skipWarmup()) refresh() }.padding(top = 8.dp, bottom = 2.dp),
+                        color = C.accent300, fontSize = 14.sp, fontFamily = Inter)
+                }
             }
             val n = state.nextSegment
-            Box(
-                Modifier
-                    .width(5.dp)
-                    .height(80.dp)
-                    .background(n?.let { Color(it.zone.argb) } ?: Color.DarkGray, RoundedCornerShape(3.dp))
-            )
-            Column(Modifier.weight(1.1f).padding(start = 14.dp)) {
-                Text("Neste", fontSize = 15.sp, color = Color.LightGray)
-                if (n != null) {
-                    Text(n.name, fontSize = 18.sp, color = Color.White, fontWeight = FontWeight.Bold, maxLines = 1)
-                    Text("${formatTime(n.durationSec)} · ${n.powerLowPct}–${n.powerHighPct}%", fontSize = 17.sp, color = Color(n.zone.argb))
-                    Text("${n.cadenceLow}–${n.cadenceHigh} rpm", fontSize = 16.sp, color = Color.LightGray)
-                } else {
-                    Text("Siste intervall!", fontSize = 18.sp, color = Color.White, fontWeight = FontWeight.Bold)
+            Row(Modifier.weight(1f).height(IntrinsicSize.Min)) {
+                Box(Modifier.width(2.dp).fillMaxHeight().background(n?.let { Color(it.zone.argb) } ?: C.n700))
+                Column(Modifier.padding(start = 12.dp)) {
+                    Text("Neste", color = C.n400, fontSize = 13.sp, fontFamily = Inter)
+                    if (n != null) {
+                        Text(n.name, color = C.n100, fontSize = 16.sp, fontFamily = Inter, fontWeight = FontWeight.Medium, maxLines = 1)
+                        Text("${formatTime(n.durationSec)} · ${n.powerLowPct}–${n.powerHighPct} %", color = Color(n.zone.argb), fontSize = 14.sp, fontFamily = Inter)
+                        Text("${n.cadenceLow}–${n.cadenceHigh} rpm", color = C.n400, fontSize = 13.sp, fontFamily = Inter)
+                    } else {
+                        Text("Siste intervall", color = C.n100, fontSize = 16.sp, fontFamily = Inter)
+                    }
                 }
             }
         }
 
-        // Mål og om du treffer
-        Row(verticalAlignment = Alignment.Bottom, modifier = Modifier.padding(top = 4.dp)) {
+        // 5. Mål + status
+        Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text("Mål", fontSize = 15.sp, color = Color.LightGray)
-                Text(
-                    if (seg != null) "${seg.powerLowPct}–${seg.powerHighPct}%" else "–",
-                    fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.White,
-                )
+                Text(if (seg != null) "Mål ${seg.powerLowPct}–${seg.powerHighPct} %" else "–", color = C.n100, fontSize = 24.sp, fontFamily = Inter, fontWeight = FontWeight.Medium)
+                if (seg != null) Text("${state.targetPowerLow}–${state.targetPowerHigh} W", color = C.n400, fontSize = 14.sp, fontFamily = Inter)
             }
-            val hint = when (state.powerStatus) {
-                TargetStatus.LOW -> "▲ Øk"
-                TargetStatus.HIGH -> "▼ Senk"
-                TargetStatus.IN_RANGE -> "✓ Bra"
-                TargetStatus.NO_DATA -> ""
-            }
-            Text(hint, fontSize = 26.sp, fontWeight = FontWeight.Bold, color = statusColor(state.powerStatus))
+            StatusPill(state)
         }
 
         StandBanner(state.stand, showSit = state.elapsedSec < sitBannerUntil)
 
-        // Rund måler: % av FTP, watt og kadens
+        // 6. Måleren
         PowerGauge(
             ftp = ftp,
             powerW = state.powerW,
@@ -273,58 +331,100 @@ fun RideScreen(activity: MainActivity, workout: Workout, onFinished: (RideSummar
             modifier = Modifier.fillMaxWidth().weight(1f),
         )
 
-        WorkoutProfile(workout, ftp, state.elapsedSec, Modifier.fillMaxWidth().height(64.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(sourceStatus, color = Color.Gray, fontSize = 12.sp, modifier = Modifier.weight(1f))
-            if (spotifyOn) {
-                TextButton(onClick = { no.spinapp.SpotifyControl.previous(context) }) { Text("⏮", fontSize = 20.sp) }
-                TextButton(onClick = {
-                    if (musicPlaying) no.spinapp.SpotifyControl.pause(context) else no.spinapp.SpotifyControl.play(context)
-                    musicPlaying = !musicPlaying
-                }) { Text(if (musicPlaying) "⏸" else "▶", fontSize = 20.sp) }
-                TextButton(onClick = { skipSong() }) { Text("⏭", fontSize = 20.sp) }
-            }
+        // 7. Profil for hele økta
+        Canvas(Modifier.fillMaxWidth().height(58.dp)) {
+            drawProfileProgress(workout, state.elapsedSec, state.segmentIndex)
+        }
+        Row {
+            Text(formatTime(state.elapsedSec), Modifier.weight(1f), color = C.n400, fontSize = 12.sp, fontFamily = Inter)
+            Text(formatTime(workout.durationSec), color = C.n400, fontSize = 12.sp, fontFamily = Inter)
         }
 
-        if (session.inWarmup()) {
-            OutlinedButton(
-                onClick = { if (session.skipWarmup()) state = session.state(source?.freshSample()) },
-                modifier = Modifier.fillMaxWidth(),
-            ) { Text("Hopp over oppvarming ⏭", fontSize = 16.sp) }
-        } else if (state.nextSegment != null) {
-            OutlinedButton(
-                onClick = { if (session.skipToNext()) state = session.state(source?.freshSample()) },
-                modifier = Modifier.fillMaxWidth(),
-            ) { Text("Neste intervall ⏭", fontSize = 16.sp) }
-        }
-
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Button(
-                onClick = { paused = !paused; confirmStop = false },
-                modifier = Modifier.weight(1f).height(56.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = if (paused) GOOD else WARN),
-            ) {
-                Text(
-                    if (paused) (if (state.elapsedSec == 0) "START" else "FORTSETT") else "PAUSE",
-                    fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.Black,
-                )
-            }
-            OutlinedButton(
-                onClick = {
-                    if (!confirmStop) {
-                        confirmStop = true
-                    } else {
-                        paused = true
-                        if (spotifyOn && musicPlaying) no.spinapp.SpotifyControl.pause(context)
-                        val summary = if (session.elapsedSec > 60) session.summary() else null
-                        summary?.let { saveRide(it) }
-                        onFinished(summary)
-                    }
-                },
-                modifier = Modifier.weight(1f).height(56.dp),
-            ) { Text(if (confirmStop) "Trykk igjen for å avslutte" else "Avslutt", fontSize = 14.sp) }
+        // 8. Øktkontroller
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            ControlButton("⏮") { if (session.skipToPrevious()) refresh() }
+            AccentButton(
+                if (paused) (if (state.elapsedSec == 0) "Start" else "Fortsett") else "Pause",
+                { paused = !paused }, Modifier.weight(1f), big = true,
+                icon = { if (paused) Icon(Ico.Play, C.n100, 18.dp) else Text("❚❚", color = C.n100, fontSize = 14.sp) },
+            )
+            ControlButton("⏭") { if (session.skipToNext()) refresh() }
         }
     }
+
+    if (endSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { endSheet = false; paused = pausedBeforeEnd },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = C.surface, scrimColor = C.scrim,
+            shape = RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp),
+            dragHandle = { SheetHandle() },
+        ) {
+            Column(Modifier.fillMaxWidth().padding(horizontal = 18.dp).padding(bottom = 28.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                Text("Avslutte økta?", color = C.n100, fontSize = 24.sp, fontFamily = Inter, fontWeight = FontWeight.Medium)
+                Muted("Du har syklet ${formatTime(session.elapsedSec)}." + if (session.elapsedSec < 300) " Økter under 5 min lagres ikke." else "", 15, C.n300)
+                AccentButton("Avslutt og lagre", {
+                    endSheet = false
+                    if (spotifyOn && musicPlaying) no.spinapp.SpotifyControl.pause(context)
+                    val summary = if (session.elapsedSec > 60) session.summary() else null
+                    summary?.let { saveRide(it) }
+                    onFinished(summary)
+                }, Modifier.fillMaxWidth(), big = true)
+                Text("Fortsett å sykle", Modifier.fillMaxWidth().clickable { endSheet = false; paused = false }.padding(vertical = 12.dp),
+                    color = C.accent300, fontSize = 16.sp, fontFamily = Inter, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+            }
+        }
+    }
+}
+
+@Composable
+private fun MusicButton(symbol: String, onClick: () -> Unit) {
+    Box(
+        Modifier.size(40.dp).clip(RoundedCornerShape(8.dp)).border(1.dp, C.n700, RoundedCornerShape(8.dp)).clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) { Text(symbol, color = C.n200, fontSize = 15.sp) }
+}
+
+@Composable
+private fun ControlButton(symbol: String, onClick: () -> Unit) {
+    Box(
+        Modifier.size(56.dp).clip(RoundedCornerShape(8.dp)).border(1.dp, C.n700, RoundedCornerShape(8.dp)).clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) { Text(symbol, color = C.n200, fontSize = 18.sp) }
+}
+
+/** «I mål ✓» / «Øk ↑ +18 W» / «Senk ↓ −12 W». */
+@Composable
+private fun StatusPill(state: RideState) {
+    val p = state.powerW
+    val (text, color) = when (state.powerStatus) {
+        TargetStatus.IN_RANGE -> "I mål ✓" to C.good
+        TargetStatus.LOW -> "Øk ↑ +${state.targetPowerLow - (p ?: 0)} W" to C.bad
+        TargetStatus.HIGH -> "Senk ↓ −${(p ?: 0) - state.targetPowerHigh} W" to C.warn
+        TargetStatus.NO_DATA -> "Ingen data" to C.n500
+    }
+    Text(
+        text,
+        Modifier.clip(RoundedCornerShape(50)).background(color.copy(alpha = 0.16f)).border(1.dp, color, RoundedCornerShape(50))
+            .padding(horizontal = 14.dp, vertical = 8.dp),
+        color = color, fontSize = 16.sp, fontFamily = Inter, fontWeight = FontWeight.Medium,
+    )
+}
+
+/** Profil under økta: gjennomførte intervaller dempet til 35 %, hvit avspillingslinje. */
+private fun DrawScope.drawProfileProgress(workout: Workout, elapsed: Int, currentIndex: Int) {
+    val total = workout.durationSec.toFloat().coerceAtLeast(1f)
+    val y100 = size.height - 100f / 160f * size.height
+    drawLine(C.n600, Offset(0f, y100), Offset(size.width, y100), 2f, pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(8f, 8f)))
+    var x = 0f
+    workout.segments.forEachIndexed { i, s ->
+        val w = s.durationSec / total * size.width
+        val h = s.midPct.toFloat().coerceAtMost(160f) / 160f * size.height
+        drawRect(Color(s.zone.argb).copy(alpha = if (i < currentIndex) 0.35f else 1f), Offset(x, size.height - h), Size((w - 1.5f).coerceAtLeast(1.5f), h))
+        x += w
+    }
+    val px = elapsed / total * size.width
+    drawLine(C.n100, Offset(px, 0f), Offset(px, size.height), 2.dp.toPx())
 }
 
 /** Profil av økta: søyler farget etter sone, med markør for hvor du er. */

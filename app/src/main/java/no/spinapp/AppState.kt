@@ -30,7 +30,26 @@ object AppState {
 
     var ftp: Int
         get() = prefs.getInt("ftp", 180)
-        set(v) = prefs.edit().putInt("ftp", v.coerceIn(50, 600)).apply()
+        set(v) {
+            val nv = v.coerceIn(50, 600)
+            prefs.edit().putInt("ftp", nv).apply()
+            recordFtp(nv)
+        }
+
+    /** FTP-historikk som (dag, watt), én verdi per dag. Til grafen i Logg. */
+    fun ftpHistory(): List<Pair<Long, Int>> {
+        val raw = prefs.getString("ftpHist", null)
+        val list = raw?.split(",")?.mapNotNull { e ->
+            val p = e.split(":"); if (p.size == 2) (p[0].toLongOrNull() ?: return@mapNotNull null) to (p[1].toIntOrNull() ?: return@mapNotNull null) else null
+        }.orEmpty()
+        return list.ifEmpty { listOf(LocalDate.now().toEpochDay() to ftp) }
+    }
+
+    private fun recordFtp(v: Int) {
+        val today = LocalDate.now().toEpochDay()
+        val list = ftpHistory().filter { it.first != today } + (today to v)
+        prefs.edit().putString("ftpHist", list.takeLast(50).joinToString(",") { "${it.first}:${it.second}" }).apply()
+    }
 
     var sessionsPerWeek: Int
         get() = prefs.getInt("sessionsPerWeek", 3)

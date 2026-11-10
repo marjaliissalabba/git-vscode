@@ -75,6 +75,18 @@ class ComposerTest {
     }
 
     @Test
+    fun skipToPrevious() {
+        val s = RideSession(WorkoutLibrary.threshold, 200)
+        s.skipToNext() // til Pause
+        repeat(10) { s.tick(null) }
+        assertTrue(s.skipToPrevious()) // > 3 s inn: start av Pause
+        assertEquals("Pause", s.state(null).segment?.name)
+        assertEquals(0, s.state(null).segmentRemainingSec - s.state(null).segment!!.durationSec)
+        assertTrue(s.skipToPrevious()) // < 3 s inn: forrige intervall
+        assertEquals("Terskel 1/3", s.state(null).segment?.name)
+    }
+
+    @Test
     fun jsonRoundTrip() {
         val w = WorkoutLibrary.climbSprint.copy(id = "custom-1", name = "Min klatring")
         val back = WorkoutJson.fromJson(JSONObject(WorkoutJson.toJson(w).toString()))

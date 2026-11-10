@@ -28,6 +28,10 @@ data class RideRecord(
     val best20MinPower: Int?,
     val ftpAtRide: Int,
     val ftpTestResult: Int?,
+    /** Sekunder i hver sone Z1–Z8 (tom for eldre økter). */
+    val zoneSec: List<Int> = emptyList(),
+    /** Snitt-watt per 15 s (tom for eldre økter). */
+    val trace: List<Int> = emptyList(),
 ) {
     fun toJson(): String = JSONObject()
         .put("t", startedAtEpochSec)
@@ -45,6 +49,8 @@ data class RideRecord(
         .put("b20", best20MinPower ?: JSONObject.NULL)
         .put("ftp", ftpAtRide)
         .put("ftpt", ftpTestResult ?: JSONObject.NULL)
+        .put("z", org.json.JSONArray(zoneSec))
+        .put("tr", org.json.JSONArray(trace))
         .toString()
 
     fun localDate(zone: ZoneId = ZoneId.systemDefault()): LocalDate =
@@ -69,6 +75,8 @@ data class RideRecord(
                 best20MinPower = if (j.isNull("b20")) null else j.optInt("b20"),
                 ftpAtRide = j.optInt("ftp"),
                 ftpTestResult = if (j.isNull("ftpt")) null else j.optInt("ftpt"),
+                zoneSec = j.optJSONArray("z")?.let { a -> (0 until a.length()).map { a.optInt(it) } } ?: emptyList(),
+                trace = j.optJSONArray("tr")?.let { a -> (0 until a.length()).map { a.optInt(it) } } ?: emptyList(),
             )
         }.getOrNull()
 
@@ -88,6 +96,8 @@ data class RideRecord(
             best20MinPower = summary.best20MinPower,
             ftpAtRide = ftp,
             ftpTestResult = summary.ftpTestResult,
+            zoneSec = Zone.entries.map { summary.secondsInZone[it] ?: 0 },
+            trace = summary.powerTrace,
         )
     }
 }
@@ -122,6 +132,19 @@ object HistoryPolicy {
 data class WeekStats(val rides: Int, val minutes: Int, val tss: Int, val kilojoules: Int)
 
 object HistoryStats {
+    /** Minutter per sone for de siste [weeks] ukene (eldst først), til «Tid i soner». */
+    fun zoneMinutesByWeek(records: List<RideRecord>, today: LocalDate, weeks: Int = 8, zone: ZoneId = ZoneId.systemDefault()): List<IntArray> {
+        val wf = WeekFields.of(Locale("nb", "NO"))
+        val thisWeekStart = today.with(wf.dayOfWeek(), 1)
+        return (weeks - 1 downTo 0).map { back ->
+            val start = thisWeekStart.minusWeeks(back.toLong())
+            val acc = IntArray(Zone.entries.size)
+            records.filter { val d = it.localDate(zone); !d.isBefore(start) && d.isBefore(start.plusDays(7)) }
+                .forEach { r -> r.zoneSec.forEachIndexed { i, s -> if (i < acc.size) acc[i] += s } }
+            IntArray(acc.size) { acc[it] / 60 }
+        }
+    }
+
     fun week(records: List<RideRecord>, today: LocalDate, zone: ZoneId = ZoneId.systemDefault()): WeekStats {
         val wf = WeekFields.of(Locale("nb", "NO"))
         val start = today.with(wf.dayOfWeek(), 1)

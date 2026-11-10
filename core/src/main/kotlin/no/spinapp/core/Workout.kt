@@ -7,14 +7,14 @@ import kotlin.math.roundToInt
  * hardest (rød, mørkerød, lilla). 100 % ligger i den oransje terskelsonen.
  */
 enum class Zone(val label: String, val short: String, val lowPct: Int, val highPct: Int, val argb: Long) {
-    Z1("Z1 Restitusjon", "Lett", 0, 55, 0xFF8A949E),
-    Z2("Z2 Utholdenhet", "Rolig", 56, 75, 0xFF2E86DE),
-    Z3("Z3 Tempo", "Tempo", 76, 87, 0xFF27AE60),
-    Z4("Z4 Sweet spot", "Sweet spot", 88, 94, 0xFFF1C40F),
-    Z5("Z5 Terskel", "Terskel", 95, 105, 0xFFF39C12),
-    Z6("Z6 VO2maks", "Hardt", 106, 120, 0xFFE74C3C),
-    Z7("Z7 Anaerob", "Svært hardt", 121, 150, 0xFF922B21),
-    Z8("Z8 Sprint", "Sprint", 151, 999, 0xFF8E44AD);
+    Z1("Z1 Restitusjon", "Restitusjon", 0, 55, 0xFF8B90A3),
+    Z2("Z2 Utholdenhet", "Utholdenhet", 56, 75, 0xFF4F8FE0),
+    Z3("Z3 Tempo", "Tempo", 76, 87, 0xFF3DB877),
+    Z4("Z4 Sweet spot", "Sweet spot", 88, 94, 0xFFE6C13A),
+    Z5("Z5 Terskel", "Terskel", 95, 105, 0xFFEC9238),
+    Z6("Z6 VO2maks", "VO2maks", 106, 120, 0xFFE2533F),
+    Z7("Z7 Anaerob", "Anaerob", 121, 150, 0xFFA8382C),
+    Z8("Z8 Sprint", "Sprint", 151, 999, 0xFF9B5AD6);
 
     companion object {
         fun forPct(pct: Double): Zone = entries.firstOrNull { pct <= it.highPct + 0.5 } ?: Z8
@@ -70,6 +70,16 @@ data class Workout(
     fun startOf(index: Int) = segments.take(index).sumOf { it.durationSec }
 
     /** Treningsbelastning (TSS) hvis man treffer midten av alle mål. */
+    /** Sekunder i hver sone (etter midten av målet), indeksert som [Zone.entries]. */
+    fun zoneSeconds(): IntArray {
+        val out = IntArray(Zone.entries.size)
+        segments.forEach { out[it.zone.ordinal] += it.durationSec }
+        return out
+    }
+
+    /** Høyeste mål i økta (% av FTP). */
+    val peakPct get() = segments.maxOfOrNull { it.powerHighPct } ?: 0
+
     fun estimatedTss(): Int {
         var sum = 0.0
         for (s in segments) {

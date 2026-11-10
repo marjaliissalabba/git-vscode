@@ -39,6 +39,8 @@ data class RideSummary(
     val best20MinPower: Int?,
     val ftpTestResult: Int?,
     val suggestedFtp: Int?,
+    /** Snitt-watt per 15 s, til grafen i loggen (ca. 240 tall per time). */
+    val powerTrace: List<Int> = emptyList(),
 )
 
 /**
@@ -131,6 +133,16 @@ class RideSession(val workout: Workout, val ftp: Int) {
         return true
     }
 
+    /**
+     * Forrige: er man mer enn 3 s inn i intervallet, går den til starten av det,
+     * ellers til starten av forrige intervall.
+     */
+    fun skipToPrevious(): Boolean {
+        val loc = workout.locate(elapsedSec) ?: return false
+        elapsedSec = if (loc.second > 3 || loc.first == 0) workout.startOf(loc.first) else workout.startOf(loc.first - 1)
+        return true
+    }
+
     /** Hopper til starten av neste intervall. Returnerer false hvis det ikke finnes noe neste. */
     fun skipToNext(): Boolean {
         val loc = workout.locate(elapsedSec) ?: return false
@@ -170,6 +182,7 @@ class RideSession(val workout: Workout, val ftp: Int) {
             best20MinPower = best20,
             ftpTestResult = ftpTest,
             suggestedFtp = suggested,
+            powerTrace = powerLog.chunked(15) { it.average().roundToInt() },
         )
     }
 
