@@ -513,8 +513,6 @@ private class Coach(context: Context) {
     }
 }
 
-/** Stort banner: «Stå opp om …», «STÅ OPP» med nedtelling, eller «Sitt ned». */
-@Composable
 /**
  * «STÅ OPP» / «Gjør deg klar» / «SITT NED» der intervallnavnet står, så måleren beholder plassen.
  * Returnerer false når det ikke er noe å vise (da vises intervallnavnet).
