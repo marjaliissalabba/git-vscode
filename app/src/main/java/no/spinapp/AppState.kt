@@ -102,6 +102,11 @@ object AppState {
         get() = prefs.getBoolean("spotifyControl", true)
         set(v) = prefs.edit().putBoolean("spotifyControl", v).apply()
 
+    /** Vis ekornet ved måleren under økta. */
+    var squirrelEnabled: Boolean
+        get() = prefs.getBoolean("squirrelEnabled", true)
+        set(v) = prefs.edit().putBoolean("squirrelEnabled", v).apply()
+
     /** Terskler for ekornet ved måleren (justeres under Profil → Ekornet). Versjon 2 = nye definisjoner. */
     var squirrelThresholds: no.spinapp.core.SquirrelThresholds
         get() {

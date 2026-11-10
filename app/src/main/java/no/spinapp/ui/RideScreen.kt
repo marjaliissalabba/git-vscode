@@ -336,6 +336,7 @@ fun RideScreen(activity: MainActivity, workout: Workout, onFinished: (RideSummar
             cadenceStatus = state.cadenceStatus,
             paused = paused,
             showSquirrelLabel = workout.id == "ekorntest",
+            showSquirrel = remember { AppState.squirrelEnabled },
             modifier = Modifier.fillMaxWidth().weight(1f),
         )
 

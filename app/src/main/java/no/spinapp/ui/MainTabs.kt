@@ -797,8 +797,12 @@ private fun SquirrelCard(ftp: Int) {
     sm.thresholds = th
     val mode = sm.update(ftp * testPct / 100, testRpm, ftp, paused = false)
     fun save(t: no.spinapp.core.SquirrelThresholds) { th = t; AppState.squirrelThresholds = t }
+    var enabled by remember { mutableStateOf(AppState.squirrelEnabled) }
 
     SpinCard {
+        ToggleRow("Vis ekornet under økta", "Animasjonen til venstre for måleren.", enabled) { enabled = it; AppState.squirrelEnabled = it }
+        if (!enabled) return@SpinCard
+        Spacer(Modifier.height(6.dp))
         Muted("Ekornet ved måleren viser hvordan du sykler: står og puster, løper, løper fort og sprettende, eller løper rett opp (klatrer). Prøv verdier her:", 14, C.n300)
         Spacer(Modifier.height(10.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
