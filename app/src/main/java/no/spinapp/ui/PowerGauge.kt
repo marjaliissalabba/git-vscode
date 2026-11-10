@@ -62,6 +62,7 @@ fun PowerGauge(
     cadenceHigh: Int?,
     cadenceStatus: TargetStatus,
     paused: Boolean = false,
+    showSquirrelLabel: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     val pct: Double? = powerW?.let { it * 100.0 / ftp }
@@ -134,7 +135,7 @@ fun PowerGauge(
         val x = if (outside >= 0.dp) outside else (maxWidth - side) / 2
         val y = if (outside >= 0.dp) (maxHeight - anim) / 2 else (maxHeight + side) / 2 - anim
         SquirrelAnimation(
-            ftp = ftp, watts = powerW, rpm = cadence, paused = paused,
+            ftp = ftp, watts = powerW, rpm = cadence, paused = paused, showLabel = showSquirrelLabel,
             modifier = Modifier.align(Alignment.TopStart).offset(x = x, y = y),
         )
     }

@@ -23,6 +23,8 @@ import no.spinapp.AppState
 import no.spinapp.core.SquirrelClip
 import no.spinapp.core.SquirrelPlayer
 import no.spinapp.core.SquirrelDirector
+import no.spinapp.core.SquirrelMode
+import androidx.compose.ui.unit.sp
 
 /**
  * Ekornet på fast plass ved måleren. Watt/FTP og rpm velger tilstand:
@@ -32,7 +34,10 @@ import no.spinapp.core.SquirrelDirector
  * bytter bare når en ny tilstand holder seg. Tersklene justeres under Profil → Ekornet.
  */
 @Composable
-fun SquirrelAnimation(ftp: Int, watts: Int?, rpm: Int?, paused: Boolean, size: Dp = 64.dp, modifier: Modifier = Modifier) {
+fun SquirrelAnimation(
+    ftp: Int, watts: Int?, rpm: Int?, paused: Boolean, size: Dp = 64.dp, modifier: Modifier = Modifier,
+    showLabel: Boolean = false,
+) {
     val context = LocalContext.current
     val frames = remember { loadSquirrelFrames(context) }
     val director = remember { SquirrelDirector(AppState.squirrelThresholds) }
@@ -43,6 +48,7 @@ fun SquirrelAnimation(ftp: Int, watts: Int?, rpm: Int?, paused: Boolean, size: D
     val f by rememberUpdatedState(ftp)
     val p by rememberUpdatedState(paused)
     var shown by remember { mutableStateOf(SquirrelClip.IDLE to 0) }
+    var mode by remember { mutableStateOf(SquirrelMode.IDLE) }
 
     LaunchedEffect(Unit) {
         var last = 0L
@@ -51,6 +57,7 @@ fun SquirrelAnimation(ftp: Int, watts: Int?, rpm: Int?, paused: Boolean, size: D
                 if (last != 0L) {
                     val dt = (t - last) / 1e6
                     val target = director.update(dt, w, r, f, p)
+                    mode = target
                     shown = player.advance(dt, target, director.animRpm)
                 }
                 last = t
@@ -59,13 +66,28 @@ fun SquirrelAnimation(ftp: Int, watts: Int?, rpm: Int?, paused: Boolean, size: D
     }
 
     val list = frames[shown.first]
-    if (!list.isNullOrEmpty()) {
-        Image(
-            bitmap = list[shown.second.coerceIn(0, list.lastIndex)],
-            contentDescription = null,
-            filterQuality = FilterQuality.None, // skarp pikselkunst
-            modifier = modifier.size(size),
-        )
+    androidx.compose.foundation.layout.Column(modifier, horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally) {
+        if (!list.isNullOrEmpty()) {
+            Image(
+                bitmap = list[shown.second.coerceIn(0, list.lastIndex)],
+                contentDescription = null,
+                filterQuality = FilterQuality.None, // skarp pikselkunst
+                modifier = Modifier.size(size),
+            )
+        } else {
+            androidx.compose.material3.Text("(mangler bilder)", color = C.bad, fontSize = 10.sp)
+        }
+        if (showLabel) {
+            androidx.compose.material3.Text(
+                when (mode) {
+                    SquirrelMode.IDLE -> "Står"
+                    SquirrelMode.RUN -> "Løper"
+                    SquirrelMode.SPRINT -> "Hopper"
+                    SquirrelMode.CLIMB -> "Klatrer"
+                } + " · ${director.animRpm} rpm",
+                color = C.n400, fontSize = 10.sp, fontFamily = Inter,
+            )
+        }
     }
 }
 

@@ -316,7 +316,8 @@ private fun OkterTab(onOpen: (Workout) -> Unit, onBuild: () -> Unit) {
 private fun WorkoutSheet(w: Workout, ftp: Int, onStart: (Workout) -> Unit, onEdit: () -> Unit) {
     val original = remember(w) { WorkoutComposer.mainMinutes(w) }
     val options = remember(w) { WorkoutComposer.lengthOptions(w) }
-    var warmup by remember { mutableIntStateOf(AppState.warmupMinutes) }
+    // Ekorn-testen skal vise tilstandene med en gang, så den starter uten oppvarming
+    var warmup by remember { mutableIntStateOf(if (w.id == "ekorntest") 0 else AppState.warmupMinutes) }
     var length by remember(w) { mutableIntStateOf(original) }
     val composed = remember(w, warmup, length) { WorkoutComposer.compose(w, warmup, if (length == original) null else length) }
     val main = remember(w, length) { if (length == original) w else WorkoutComposer.scale(w, length) }
@@ -362,7 +363,7 @@ private fun WorkoutSheet(w: Workout, ftp: Int, onStart: (Workout) -> Unit, onEdi
             }
             StepButton(true, { options.firstOrNull { it > length }?.let { length = it } }, 40.dp, enabled = options.any { it > length })
         }
-        AccentButton("Start økta", { AppState.warmupMinutes = warmup; onStart(composed) }, Modifier.fillMaxWidth(), big = true,
+        AccentButton("Start økta", { if (w.id != "ekorntest") AppState.warmupMinutes = warmup; onStart(composed) }, Modifier.fillMaxWidth(), big = true,
             icon = { Icon(Ico.Play, C.n100, 18.dp) })
         Text(
             if (CustomWorkoutStore.isCustom(w.id)) "Endre økta" else "Lag egen versjon",
