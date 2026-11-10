@@ -56,6 +56,7 @@ fun HomeScreen(
     onBleSetup: () -> Unit,
     onCameraSetup: () -> Unit,
     onHistory: () -> Unit,
+    onBuild: (Workout?) -> Unit,
 ) {
     var ftp by remember { mutableIntStateOf(AppState.ftp) }
     var ftpText by remember { mutableStateOf(AppState.ftp.toString()) }
@@ -176,10 +177,27 @@ fun HomeScreen(
             }
         }
 
+        // Mine økter
+        val custom by no.spinapp.CustomWorkoutStore.workouts.collectAsState()
+        Card(Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Mine økter", fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
+                if (custom.isEmpty()) {
+                    Text(
+                        "Lag din egen økt, eller trykk Start på en ferdig økt og velg «Lag egen versjon».",
+                        color = Color.Gray, fontSize = 13.sp,
+                    )
+                }
+                custom.forEach { w -> WorkoutRow(w.name, w, ftp, onStartWorkout) }
+                OutlinedButton(onClick = { onBuild(null) }) { Text("+ Lag ny økt") }
+            }
+        }
+
         // Alle økter
         Card(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Alle økter", fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
+                Text("Ferdige økter", fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
+                Text("Oppvarming og lengde velger du når du trykker Start.", color = Color.Gray, fontSize = 13.sp)
                 WorkoutLibrary.all.forEach { w -> WorkoutRow(w.name, w, ftp, onStartWorkout, showDescription = true) }
             }
         }

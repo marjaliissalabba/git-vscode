@@ -7,7 +7,6 @@ import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
-import android.speech.tts.TextToSpeech
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -76,6 +75,7 @@ fun RideScreen(activity: MainActivity, workout: Workout, onFinished: (RideSummar
     var paused by remember { mutableStateOf(true) }
     var confirmStop by remember { mutableStateOf(false) }
     val coach = remember { Coach(context) }
+    var sitBannerUntil by remember { mutableStateOf(-1) }
     val startedAt = remember { System.currentTimeMillis() / 1000 }
     val spotifyOn = remember { AppState.spotifyControl && no.spinapp.SpotifyControl.isInstalled(context) }
     var musicPlaying by remember { mutableStateOf(false) }
@@ -135,7 +135,8 @@ fun RideScreen(activity: MainActivity, workout: Workout, onFinished: (RideSummar
     LaunchedEffect(paused) {
         if (paused) return@LaunchedEffect
         var lastIndex = state.segmentIndex
-        if (state.elapsedSec == 0) coach.segmentChange(state, ftp)
+        if (state.elapsedSec == 0) coach.segmentChange()
+        var wasStanding = state.stand.standing
         var next = System.currentTimeMillis() + 1000
         while (!paused) {
             delay((next - System.currentTimeMillis()).coerceAtLeast(0))
@@ -143,7 +144,6 @@ fun RideScreen(activity: MainActivity, workout: Workout, onFinished: (RideSummar
             state = session.tick(source?.freshSample())
             AppState.currentTarget.value = state.segment
             if (state.finished) {
-                coach.say("Bra jobba! Økta er ferdig.")
                 val summary = session.summary()
                 saveRide(summary)
                 if (spotifyOn) no.spinapp.SpotifyControl.pause(context)
@@ -153,7 +153,7 @@ fun RideScreen(activity: MainActivity, workout: Workout, onFinished: (RideSummar
             if (state.segmentIndex != lastIndex) {
                 val prevSeg = workout.segments.getOrNull(lastIndex)
                 lastIndex = state.segmentIndex
-                coach.segmentChange(state, ftp)
+                coach.segmentChange()
                 val nextSeg = state.segment
                 val since = lastSkipAt?.let { session.elapsedSec - it }
                 if (tempoLists && nextSeg != null) {
@@ -170,6 +170,12 @@ fun RideScreen(activity: MainActivity, workout: Workout, onFinished: (RideSummar
             } else if (state.segmentRemainingSec in 1..3) {
                 coach.beep()
             }
+            // Stå opp / sitt ned midt i intervallet
+            val st = state.stand
+            if (st.standing && !wasStanding) coach.standUp()
+            else if (!st.standing && wasStanding) { coach.sitDown(); sitBannerUntil = state.elapsedSec + 3 }
+            else if (st.standInSec != null && st.standInSec!! in 1..3) coach.beep()
+            wasStanding = st.standing
         }
     }
 
@@ -252,6 +258,8 @@ fun RideScreen(activity: MainActivity, workout: Workout, onFinished: (RideSummar
             Text(hint, fontSize = 26.sp, fontWeight = FontWeight.Bold, color = statusColor(state.powerStatus))
         }
 
+        StandBanner(state.stand, showSit = state.elapsedSec < sitBannerUntil)
+
         // Rund måler: % av FTP, watt og kadens
         PowerGauge(
             ftp = ftp,
@@ -283,6 +291,11 @@ fun RideScreen(activity: MainActivity, workout: Workout, onFinished: (RideSummar
                 onClick = { if (session.skipWarmup()) state = session.state(source?.freshSample()) },
                 modifier = Modifier.fillMaxWidth(),
             ) { Text("Hopp over oppvarming ⏭", fontSize = 16.sp) }
+        } else if (state.nextSegment != null) {
+            OutlinedButton(
+                onClick = { if (session.skipToNext()) state = session.state(source?.freshSample()) },
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text("Neste intervall ⏭", fontSize = 16.sp) }
         }
 
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -329,6 +342,12 @@ fun WorkoutProfile(workout: Workout, ftp: Int, progressSec: Int?, modifier: Modi
                 topLeft = Offset(x, size.height - h),
                 size = Size(maxOf(1f, w - 0.5f), h),
             )
+            // Ståperioder: hvit stripe øverst på søylen
+            for (st in s.stand) {
+                val sx = x + st.fromSec / total * size.width
+                val sw = st.lengthSec / total * size.width
+                drawRect(Color.White, Offset(sx, size.height - h - 5f), Size(maxOf(2f, sw), 4f))
+            }
             x += w
         }
         // FTP-linje
@@ -341,12 +360,8 @@ fun WorkoutProfile(workout: Workout, ftp: Int, progressSec: Int?, modifier: Modi
     }
 }
 
-/** Talemeldinger, pip og vibrasjon ved intervallbytte. */
+/** Pip og vibrasjon ved intervallbytte og stå opp/sitt ned. Ingen opplesning. */
 private class Coach(context: Context) {
-    private var ready = false
-    private val tts: TextToSpeech = TextToSpeech(context) { status ->
-        ready = status == TextToSpeech.SUCCESS
-    }
     private val tone = runCatching { ToneGenerator(AudioManager.STREAM_MUSIC, 80) }.getOrNull()
     private val vibrator: Vibrator? = if (Build.VERSION.SDK_INT >= 31) {
         (context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager)?.defaultVibrator
@@ -355,38 +370,52 @@ private class Coach(context: Context) {
         context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
     }
 
-    init {
-        runCatching { tts.language = Locale("nb", "NO") }
-    }
-
-    fun say(text: String) {
-        if (ready) tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, "coach")
+    private fun vibrate(ms: Long) = runCatching {
+        vibrator?.vibrate(VibrationEffect.createOneShot(ms, VibrationEffect.DEFAULT_AMPLITUDE))
     }
 
     fun beep() {
         tone?.startTone(ToneGenerator.TONE_PROP_BEEP, 120)
     }
 
-    fun segmentChange(state: RideState, ftp: Int) {
-        val s = state.segment ?: return
+    fun segmentChange() {
         tone?.startTone(ToneGenerator.TONE_PROP_BEEP2, 300)
-        vibrator?.vibrate(VibrationEffect.createOneShot(400, VibrationEffect.DEFAULT_AMPLITUDE))
-        say("${s.name}. ${formatSpoken(s.durationSec)}. ${s.powerLow(ftp)} til ${s.powerHigh(ftp)} watt, kadens ${s.cadenceLow} til ${s.cadenceHigh}.")
+        vibrate(400)
     }
 
-    private fun formatSpoken(sec: Int): String {
-        val m = sec / 60
-        val s = sec % 60
-        return when {
-            m == 0 -> "$s sekunder"
-            s == 0 -> "$m minutter"
-            else -> "$m minutter og $s sekunder"
+    fun standUp() {
+        tone?.startTone(ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD, 500)
+        runCatching {
+            vibrator?.vibrate(VibrationEffect.createWaveform(longArrayOf(0, 300, 150, 300, 150, 300), -1))
         }
     }
 
+    fun sitDown() {
+        tone?.startTone(ToneGenerator.TONE_PROP_ACK, 300)
+        vibrate(600)
+    }
+
     fun shutdown() {
-        tts.stop()
-        tts.shutdown()
         tone?.release()
+    }
+}
+
+/** Stort banner: «Stå opp om …», «STÅ OPP» med nedtelling, eller «Sitt ned». */
+@Composable
+private fun StandBanner(cue: no.spinapp.core.StandCue, showSit: Boolean) {
+    val (text, color) = when {
+        cue.standing -> "⬆ STÅ OPP · ${formatTime(cue.standLeftSec ?: 0)}" to Color(0xFF8E44AD)
+        cue.standInSec != null -> "Gjør deg klar: stå opp om ${cue.standInSec} s" to Color(0xFF5B2C6F)
+        showSit -> "⬇ SITT NED" to Color(0xFF2E86DE)
+        else -> return
+    }
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .background(color, RoundedCornerShape(14.dp))
+            .padding(vertical = 10.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(text, fontSize = 26.sp, fontWeight = FontWeight.Bold, color = Color.White)
     }
 }

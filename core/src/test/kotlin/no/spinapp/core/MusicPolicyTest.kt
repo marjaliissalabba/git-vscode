@@ -32,13 +32,14 @@ class MusicPolicyTest {
     @Test
     fun balancedPerWorkout() {
         // Rolige økter: musikken går i fred
-        assertEquals(0, MusicPolicy.countSkips(WorkoutLibrary.endurance))
-        assertEquals(0, MusicPolicy.countSkips(WorkoutLibrary.recovery))
+        fun c(w: Workout) = WorkoutComposer.compose(w, 10)
+        assertEquals(0, MusicPolicy.countSkips(c(WorkoutLibrary.endurance)))
+        assertEquals(0, MusicPolicy.countSkips(c(WorkoutLibrary.recovery)))
         // Ett bytte per hoveddrag
-        assertEquals(3, MusicPolicy.countSkips(WorkoutLibrary.threshold))
-        assertEquals(5, MusicPolicy.countSkips(WorkoutLibrary.vo2))
+        assertEquals(3, MusicPolicy.countSkips(c(WorkoutLibrary.threshold)))
+        assertEquals(5, MusicPolicy.countSkips(c(WorkoutLibrary.vo2)))
         // Ingen økt bytter oftere enn ca. hvert 3. minutt i snitt
-        for (w in WorkoutLibrary.all) {
+        for (w in WorkoutLibrary.all.map { c(it) }) {
             val n = MusicPolicy.countSkips(w)
             assertTrue(n == 0 || w.durationSec / n >= 180, "${w.name}: $n bytter")
         }

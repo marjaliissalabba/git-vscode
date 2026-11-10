@@ -25,9 +25,6 @@
         <package android:name="com.dsi.ant.service.socket" />
         <package android:name="com.dsi.ant.usbservice" />
         <package android:name="com.spotify.music" />
-        <intent>
-            <action android:name="android.intent.action.TTS_SERVICE" />
-        </intent>
     </queries>
 
     <application

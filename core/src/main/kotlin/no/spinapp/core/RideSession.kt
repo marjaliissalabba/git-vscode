@@ -21,6 +21,7 @@ data class RideState(
     val powerStatus: TargetStatus,
     val cadenceStatus: TargetStatus,
     val zone: Zone?,
+    val stand: StandCue = StandCue(false, null, null),
 )
 
 data class RideSummary(
@@ -89,6 +90,7 @@ class RideSession(val workout: Workout, val ftp: Int) {
             powerStatus = if (seg == null) TargetStatus.NO_DATA else status(power, pLow, pHigh, tolerance(pLow)),
             cadenceStatus = if (seg == null) TargetStatus.NO_DATA else status(cad, seg.cadenceLow, seg.cadenceHigh, 3),
             zone = power?.let { Zone.forPower(it, ftp) },
+            stand = StandCues.at(seg, loc?.second ?: 0),
         )
     }
 
@@ -126,6 +128,14 @@ class RideSession(val workout: Workout, val ftp: Int) {
         var i = loc.first
         while (i < workout.segments.size && workout.segments[i].isWarmup) i++
         elapsedSec = workout.startOf(i)
+        return true
+    }
+
+    /** Hopper til starten av neste intervall. Returnerer false hvis det ikke finnes noe neste. */
+    fun skipToNext(): Boolean {
+        val loc = workout.locate(elapsedSec) ?: return false
+        if (loc.first + 1 >= workout.segments.size) return false
+        elapsedSec = workout.startOf(loc.first + 1)
         return true
     }
 

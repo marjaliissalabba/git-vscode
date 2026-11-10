@@ -83,6 +83,11 @@ object AppState {
         get() = prefs.getBoolean("spotifyControl", true)
         set(v) = prefs.edit().putBoolean("spotifyControl", v).apply()
 
+    /** Ønsket oppvarming i minutter (legges foran alle økter). */
+    var warmupMinutes: Int
+        get() = prefs.getInt("warmupMinutes", 10)
+        set(v) = prefs.edit().putInt("warmupMinutes", v).apply()
+
     /** Client ID fra appen du registrerte på developer.spotify.com (ikke hemmelig). */
     var spotifyClientId: String
         get() = prefs.getString("spotifyClientId", "") ?: ""

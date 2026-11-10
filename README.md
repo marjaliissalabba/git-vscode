@@ -25,6 +25,14 @@ Prøv kildene i denne rekkefølgen: Bluetooth, så ANT+, så kamera.
 2. Hvis ikke, velg **Kamera**, trykk «Juster kamera», slå på lyset på konsollet og dra den blå rammen over LCD-glasset. Avlesningen vises nederst.
 3. Kjør **FTP-test 20 min** for å få riktig FTP. Appen foreslår ny FTP etter testen.
 
+## Økter
+
+- **Oppvarming** er ikke en del av øktene. Når du trykker Start, velger du 0, 5, 8, 10 eller 15 min oppvarming (appen husker valget).
+- **Lengde:** Velg f.eks. 40 min på en 50-minutters økt. Da blir alle intervallene 20 % kortere (avrundet til 5 s, minst 15 s).
+- **Stå opp:** Intervaller kan ha ståperioder. Øktskjermen viser «Gjør deg klar» 10 s før, et stort «STÅ OPP»-banner med nedtelling, og «SITT NED» etterpå, med pip og vibrasjon. Ingen opplesning.
+- **Neste intervall ⏭** og **Hopp over oppvarming** på øktskjermen.
+- **Øktbygger:** «+ Lag ny økt», eller «Lag egen versjon» av en ferdig økt. Endre navn, tid, % av FTP, kadens og ståperiode per intervall, kopier, flytt og slett. Egne økter lagres bare på telefonen.
+
 ## Personvern og lagring
 
 - Ingen konto og ingen innlogging i SpinApp. Spotifys innloggingsbibliotek gir appen internettillatelse, men den brukes bare til Spotify-innloggingen hvis Spotify-appen ikke kan ta den selv. Treningsdata sendes aldri noe sted.

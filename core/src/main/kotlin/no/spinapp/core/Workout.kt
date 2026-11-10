@@ -22,6 +22,11 @@ enum class Zone(val label: String, val short: String, val lowPct: Int, val highP
     }
 }
 
+/** Stå opp fra [fromSec] til [toSec] (sekunder inn i intervallet). */
+data class StandWindow(val fromSec: Int, val toSec: Int) {
+    val lengthSec get() = toSec - fromSec
+}
+
 data class Segment(
     val name: String,
     val durationSec: Int,
@@ -33,6 +38,8 @@ data class Segment(
     val isFtpTest: Boolean = false,
     /** Oppvarming kan hoppes over. */
     val isWarmup: Boolean = false,
+    /** Perioder i intervallet der man skal stå opp (sekunder fra intervallets start). */
+    val stand: List<StandWindow> = emptyList(),
 ) {
     val midPct get() = (powerLowPct + powerHighPct) / 2.0
     val midCadence get() = (cadenceLow + cadenceHigh) / 2
@@ -77,18 +84,18 @@ data class Workout(
 class WorkoutBuilder {
     private val list = mutableListOf<Segment>()
 
-    fun seg(name: String, min: Double, low: Int, high: Int, cad: IntRange, ftpTest: Boolean = false, warmup: Boolean = false) {
-        list += Segment(name, (min * 60).roundToInt(), low, high, cad.first, cad.last, ftpTest, warmup)
+    fun seg(
+        name: String, min: Double, low: Int, high: Int, cad: IntRange,
+        ftpTest: Boolean = false, warmup: Boolean = false, stand: List<Pair<Int, Int>> = emptyList(),
+    ) {
+        list += Segment(
+            name, (min * 60).roundToInt(), low, high, cad.first, cad.last, ftpTest, warmup,
+            stand.map { StandWindow(it.first, it.second) },
+        )
     }
 
     fun repeat(times: Int, block: WorkoutBuilder.(Int) -> Unit) {
         for (i in 1..times) block(i)
-    }
-
-    fun warmup(min: Int = 10) {
-        seg("Oppvarming", min * 0.5, 45, 55, 80..90, warmup = true)
-        seg("Oppvarming", min * 0.3, 56, 65, 85..95, warmup = true)
-        seg("Oppvarming – høy kadens", min * 0.2, 60, 70, 95..105, warmup = true)
     }
 
     fun cooldown(min: Int = 5) {
@@ -101,19 +108,18 @@ class WorkoutBuilder {
 fun workout(id: String, name: String, description: String, block: WorkoutBuilder.() -> Unit) =
     Workout(id, name, description, WorkoutBuilder().apply(block).build())
 
+/** Øktene inneholder ikke oppvarming; den legges på før start (se [WorkoutComposer]). */
 object WorkoutLibrary {
-    val endurance = workout("grunn45", "Grunntrening 45", "Rolig Z2 med kadensvariasjon. Bygger motor.") {
-        warmup(10)
+    val endurance = workout("grunn45", "Grunntrening", "Rolig Z2 med kadensvariasjon. Bygger motor.") {
         repeat(3) {
             seg("Jevn Z2", 5.0, 65, 72, 85..95)
             seg("Rask fot", 2.0, 62, 70, 100..110)
-            seg("Tung fot", 3.0, 70, 75, 70..80)
+            seg("Tung fot – stå opp midt i", 3.0, 70, 75, 70..80, stand = listOf(60 to 120))
         }
         cooldown(5)
     }
 
     val threshold = workout("terskel3x8", "Terskel 3×8", "Tre drag på terskel. Hever FTP.") {
-        warmup(10)
         repeat(3) { i ->
             seg("Terskel $i/3", 8.0, 95, 100, 85..95)
             if (i < 3) seg("Pause", 4.0, 50, 55, 80..90)
@@ -123,7 +129,7 @@ object WorkoutLibrary {
     }
 
     val vo2 = workout("vo2x5", "VO2maks 5×3", "Korte, harde drag med høy kadens.") {
-        warmup(12)
+        seg("Rolig inn", 3.0, 55, 65, 85..95)
         repeat(5) { i ->
             seg("VO2 $i/5", 3.0, 110, 118, 95..105)
             seg("Pause", 3.0, 45, 55, 80..90)
@@ -131,11 +137,10 @@ object WorkoutLibrary {
         cooldown(8)
     }
 
-    val climbSprint = workout("klatring", "Klatring og sprint", "Tunge stigninger på lav kadens og korte sprinter.") {
-        warmup(10)
+    val climbSprint = workout("klatring", "Klatring og sprint", "Tunge stigninger på lav kadens, stå opp mot toppen, korte sprinter.") {
         repeat(4) { i ->
-            seg("Stigning $i/4", 4.0, 85, 95, 60..70)
-            seg("Toppen – stå opp", 1.0, 100, 110, 70..80)
+            seg("Stigning $i/4", 4.0, 85, 95, 60..70, stand = listOf(150 to 210))
+            seg("Toppen", 1.0, 100, 110, 70..80, stand = listOf(0 to 60))
             seg("Rolig", 2.0, 50, 55, 85..95)
             seg("Sprint", 0.5, 140, 170, 105..120)
             seg("Rolig", 2.5, 45, 55, 80..90)
@@ -144,7 +149,6 @@ object WorkoutLibrary {
     }
 
     val pyramid = workout("pyramide", "Pyramide", "1-2-3-4-3-2-1 minutter med stigende og synkende intensitet.") {
-        warmup(10)
         val steps = listOf(1 to 105, 2 to 100, 3 to 95, 4 to 91, 3 to 95, 2 to 100, 1 to 105)
         steps.forEach { (m, p) ->
             seg("$m min drag", m.toDouble(), p, p + 5, 90..100)
@@ -153,15 +157,14 @@ object WorkoutLibrary {
         cooldown(6)
     }
 
-    val recovery = workout("restitusjon", "Restitusjon 30", "Lett tråkk for å bli kvitt stølhet.") {
+    val recovery = workout("restitusjon", "Restitusjon", "Lett tråkk for å bli kvitt stølhet.") {
         seg("Lett", 10.0, 45, 55, 85..95)
         seg("Lett – rask fot", 5.0, 45, 55, 95..105)
         seg("Lett", 10.0, 45, 55, 85..95)
         cooldown(5)
     }
 
-    val ftpTest = workout("ftptest", "FTP-test 20 min", "Kjør så hardt du klarer jevnt i 20 min. FTP = 95 % av snittet.") {
-        seg("Oppvarming", 10.0, 50, 65, 85..95, warmup = true)
+    val ftpTest = workout("ftptest", "FTP-test 20 min", "Kjør så hardt du klarer jevnt i 20 min. FTP = 95 % av snittet. Bruk minst 10 min oppvarming.") {
         repeat(3) {
             seg("Rask fot", 1.0, 70, 80, 105..115)
             seg("Rolig", 1.0, 50, 55, 85..95)

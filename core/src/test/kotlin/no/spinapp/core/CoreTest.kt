@@ -148,7 +148,8 @@ class WorkoutTest {
     @Test
     fun libraryWorkoutsAreReasonable() {
         for (w in WorkoutLibrary.all) {
-            assertTrue(w.durationSec in 25 * 60..70 * 60, "${w.name} varer ${w.durationSec / 60} min")
+            assertTrue(w.durationSec in 20 * 60..60 * 60, "${w.name} varer ${w.durationSec / 60} min")
+            assertTrue(w.segments.none { it.isWarmup }, "${w.name} skal ikke ha oppvarming")
             assertTrue(w.segments.all { it.powerLowPct <= it.powerHighPct && it.cadenceLow <= it.cadenceHigh })
         }
     }
@@ -172,7 +173,7 @@ class WorkoutTest {
 
     @Test
     fun skipWarmup() {
-        val s = RideSession(WorkoutLibrary.threshold, 200)
+        val s = RideSession(WorkoutComposer.compose(WorkoutLibrary.threshold, 10), 200)
         assertTrue(s.inWarmup())
         s.tick(null)
         assertTrue(s.skipWarmup())

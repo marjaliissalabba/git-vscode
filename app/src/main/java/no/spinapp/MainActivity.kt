@@ -23,7 +23,9 @@ import no.spinapp.sources.CameraSource
 import no.spinapp.sources.SimulatorSource
 import no.spinapp.ui.BleSetupScreen
 import no.spinapp.ui.CameraSetupScreen
+import no.spinapp.ui.BuilderScreen
 import no.spinapp.ui.HistoryScreen
+import no.spinapp.ui.SetupScreen
 import no.spinapp.ui.HomeScreen
 import no.spinapp.ui.RideScreen
 import no.spinapp.ui.SummaryScreen
@@ -33,6 +35,10 @@ sealed interface Screen {
     data object BleSetup : Screen
     data object CameraSetup : Screen
     data object History : Screen
+    /** Velg oppvarming og lengde før start. */
+    data class Setup(val workout: Workout) : Screen
+    /** Lag eller endre en egen økt. [workout] null = ny økt. */
+    data class Builder(val workout: Workout?) : Screen
     data class Ride(val workout: Workout) : Screen
     data class Summary(val summary: RideSummary) : Screen
 }
@@ -43,6 +49,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         AppState.init(this)
         HistoryStore.init(this)
+        CustomWorkoutStore.init(this)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
         setContent {
@@ -73,12 +80,23 @@ class MainActivity : ComponentActivity() {
         when (val s = screen) {
             Screen.Home -> HomeScreen(
                 activity = this,
-                onStartWorkout = { screen = Screen.Ride(it) },
+                onStartWorkout = { screen = Screen.Setup(it) },
+                onBuild = { screen = Screen.Builder(it) },
                 onBleSetup = { screen = Screen.BleSetup },
                 onCameraSetup = { screen = Screen.CameraSetup },
                 onHistory = { screen = Screen.History },
             )
             Screen.History -> HistoryScreen(onDone = { screen = Screen.Home })
+            is Screen.Setup -> SetupScreen(
+                workout = s.workout,
+                onStart = { screen = Screen.Ride(it) },
+                onEdit = { screen = Screen.Builder(it) },
+                onBack = { screen = Screen.Home },
+            )
+            is Screen.Builder -> BuilderScreen(
+                original = s.workout,
+                onDone = { screen = Screen.Home },
+            )
             Screen.BleSetup -> BleSetupScreen(onDone = { screen = Screen.Home })
             Screen.CameraSetup -> CameraSetupScreen(activity = this, onDone = { screen = Screen.Home })
             is Screen.Ride -> RideScreen(
