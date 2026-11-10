@@ -36,6 +36,8 @@ Prøv kildene i denne rekkefølgen: Bluetooth, så ANT+, så kamera.
 ## Ekornet og Sprite-studio
 
 - `tools/sprite-studio/index.html` er et redigeringsverktøy for ekornets spritepakke (ankerpunkt og varighet per bilde, løkspeil, forhåndsvisning i appstørrelse). Det lagrer en oppdatert `animations.json`.
+- **Auto-anker** i studioet: sett ankeret på bilde 1, så følger verktøyet samme punkt gjennom resten av klippet (overganger starter fra løkka de kommer fra). **Finn hakk** markerer bilder som endrer seg mye mer enn resten (rød strek i tidslinja).
+- Appen blander hvert bilde mykt over i det neste (kan slås av under Profil → Ekornet).
 - `python3 tools/import_squirrel_sprites.py <mappe>` tar pakken inn i appen: bildene plasseres etter ankerpunktet og varighetene skrives til `assets/squirrel/timing.json`.
 
 ## Personvern og lagring

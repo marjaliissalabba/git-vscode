@@ -179,6 +179,20 @@ class SquirrelPlayer(
         private set
     private var shownMode = SquirrelMode.IDLE
     private var elapsedMs = 0.0
+    private var curDurMs = 1.0
+
+    /** Hvor langt (0–1) det viste bildet har kommet mot neste. Brukes til myk blanding. */
+    val progress: Double get() = (elapsedMs / curDurMs).coerceIn(0.0, 1.0)
+
+    /**
+     * Bildet som kommer etter det viste innen samme klipp, eller null når klippet er
+     * en overgang som er på siste bilde (da kommer et annet klipp, og blanding ville gitt hakk).
+     */
+    val nextFrame: Int? get() = when {
+        frame < clip.frames - 1 -> frame + 1
+        clip.loop -> 0
+        else -> null
+    }
 
     /**
      * Varighet per bilde i ms. Løkkene følger kadensen ut fra spritepakkens anbefalte fart:
@@ -238,6 +252,7 @@ class SquirrelPlayer(
             }
             dur = frameDurationMs(clip, rpm, frame)
         }
+        curDurMs = dur
         return clip to frame
     }
 }

@@ -106,6 +106,9 @@ object AppState {
     var squirrelEnabled: Boolean
         get() = prefs.getBoolean("squirrelEnabled", true)
         set(v) = prefs.edit().putBoolean("squirrelEnabled", v).apply()
+    var squirrelBlend: Boolean
+        get() = prefs.getBoolean("squirrelBlend", true)
+        set(v) = prefs.edit().putBoolean("squirrelBlend", v).apply()
 
     /** Terskler for ekornet ved måleren (justeres under Profil → Ekornet). Versjon 2 = nye definisjoner. */
     var squirrelThresholds: no.spinapp.core.SquirrelThresholds

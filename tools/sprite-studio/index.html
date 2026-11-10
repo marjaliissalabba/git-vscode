@@ -100,6 +100,14 @@ select { background: var(--panel-2); border: 1px solid var(--line); border-radiu
 .stack { display: flex; flex-direction: column; gap: 8px; }
 .row2 { display: flex; gap: 8px; flex-wrap: wrap; }
 textarea#jsonOut { width: 100%; height: 120px; background: #0d0e16; color: var(--muted); border: 1px solid var(--line); border-radius: 8px; font: 11px var(--font-num); }
+.thumb .jump { height: 4px; border-radius: 2px; background: var(--line); overflow: hidden; }
+.thumb .jump i { display: block; height: 100%; background: var(--ok); }
+.thumb .jump.bad i { background: var(--warn); }
+.thumb.bad { border-color: var(--warn); }
+.findings { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+.findings li { border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; cursor: pointer; }
+.findings li.bad { border-color: var(--warn); }
+.findings li:hover { background: var(--panel-2); }
 @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
 </style>
 
@@ -146,6 +154,7 @@ textarea#jsonOut { width: 100%; height: 120px; background: #0d0e16; color: var(-
       <canvas id="preview" width="384" height="384" aria-label="Forhåndsvisning 64 dp"></canvas>
       <div class="row2" style="justify-content:center">
         <label class="inline" for="chain"><input type="checkbox" id="chain" checked> Kjede overgang med løkkene</label>
+        <label class="inline" for="blend"><input type="checkbox" id="blend" checked> Myk blanding (som i appen)</label>
       </div>
       <p class="help" id="previewHelp"></p>
     </div>
@@ -171,6 +180,19 @@ textarea#jsonOut { width: 100%; height: 120px; background: #0d0e16; color: var(-
         <input id="durAll" type="number" min="10" max="2000" step="5" style="width:80px;background:#12141f;border:1px solid var(--line);border-radius:6px;padding:4px 6px;font-family:var(--font-num)">
         <button class="btn small" id="durAllBtn" type="button">Bruk</button>
       </div>
+    </div>
+    <div class="panel stack">
+      <h2>Automatikk</h2>
+      <p class="help">Sett ankeret på bekkenet i første bilde av klippet. Auto-anker finner samme punkt i resten. For overganger brukes løkkene før og etter som referanse.</p>
+      <div class="row2">
+        <button class="btn small" id="autoClip" type="button">Auto-anker: dette klippet</button>
+        <button class="btn small" id="autoAll" type="button">Auto-anker: alle klipp</button>
+      </div>
+      <div class="row2">
+        <button class="btn small" id="findJumps" type="button">Finn hakk i dette klippet</button>
+        <button class="btn small" id="findAll" type="button">Finn hakk overalt</button>
+      </div>
+      <ul class="findings" id="findings"></ul>
     </div>
     <div class="panel help">
       <h2>Slik gjør du</h2>
@@ -237,6 +259,7 @@ textarea#jsonOut { width: 100%; height: 120px; background: #0d0e16; color: var(-
   async function useMeta(json, imageFor, name) {
     meta = json;
     sheets = {};
+    normCache.clear(); jumpReport = null;
     for (const [key, s] of Object.entries(meta.sheets)) {
       sheets[key] = await loadImage(await imageFor(s.file, key));
     }
@@ -321,6 +344,7 @@ textarea#jsonOut { width: 100%; height: 120px; background: #0d0e16; color: var(-
   }
   function selectClip(n) {
     clipName = n; frameIdx = 0; seq = null; seqPos = 0; seqTime = 0;
+    if (jumpReport && jumpReport.clip !== n) jumpReport = null;
     buildTimeline();
     refreshAll();
   }
@@ -332,7 +356,7 @@ textarea#jsonOut { width: 100%; height: 120px; background: #0d0e16; color: var(-
     frames().forEach((_, i) => {
       const card = document.createElement("div");
       card.className = "thumb"; card.tabIndex = 0; card.dataset.i = i;
-      card.innerHTML = `<canvas width="156" height="156"></canvas><div class="row"><span class="n">#${String(i + 1).padStart(2, "0")}</span><span class="mark"></span></div><input type="number" min="10" max="2000" step="5" aria-label="Varighet bilde ${i + 1} i millisekunder" id="dur-${i}"><div class="ms">ms</div>`;
+      card.innerHTML = `<canvas width="156" height="156"></canvas><div class="row"><span class="n">#${String(i + 1).padStart(2, "0")}</span><span class="mark"></span></div><input type="number" min="10" max="2000" step="5" aria-label="Varighet bilde ${i + 1} i millisekunder" id="dur-${i}"><div class="ms">ms</div><div class="jump" title="Endring fra forrige bilde"><i></i></div>`;
       card.addEventListener("click", (e) => { if (e.target.tagName !== "INPUT") { frameIdx = i; refreshAll(); } });
       card.querySelector("input").addEventListener("change", (e) => {
         const v = Math.max(10, Math.min(2000, Math.round(+e.target.value || 0)));
@@ -347,6 +371,13 @@ textarea#jsonOut { width: 100%; height: 120px; background: #0d0e16; color: var(-
       const fd = frameData(clipName, i);
       card.classList.toggle("on", i === frameIdx);
       card.querySelector(".mark").classList.toggle("set", fd.set);
+      const jr = jumpReport && jumpReport.clip === clipName ? jumpReport : null;
+      const jb = card.querySelector(".jump");
+      if (jr) {
+        const v = jr.scores[i], bad = jr.bad.includes(i);
+        jb.firstElementChild.style.width = Math.min(100, (v / (jr.max || 1)) * 100) + "%";
+        jb.classList.toggle("bad", bad); card.classList.toggle("bad", bad);
+      } else { jb.firstElementChild.style.width = "0"; jb.classList.remove("bad"); card.classList.remove("bad"); }
       const inp = card.querySelector("input");
       if (document.activeElement !== inp) inp.value = fd.d;
       const c = card.querySelector("canvas"), g = c.getContext("2d");
@@ -440,14 +471,21 @@ textarea#jsonOut { width: 100%; height: 120px; background: #0d0e16; color: var(-
       : "Spiller klippet med ankeret fast i midten, i samme størrelse som i appen.";
     return list;
   }
-  function drawPreview(name, i) {
+  function drawFrameTo(g, size, name, i, alpha) {
     const fd = frameData(name, i);
+    const s = size / Math.max(fd.f.w, fd.f.h);
+    g.globalAlpha = alpha;
+    g.drawImage(fd.sheet, fd.f.x, fd.f.y, fd.f.w, fd.f.h, size / 2 - fd.ax * s, size / 2 - fd.ay * s, fd.f.w * s, fd.f.h * s);
+    g.globalAlpha = 1;
+  }
+  function drawPreview(name, i, blendNext) {
     pg.clearRect(0, 0, pv.width, pv.height);
     pg.fillStyle = "#161826"; pg.fillRect(0, 0, pv.width, pv.height);
-    // Samme regel som importskriptet: ruten skaleres til full bredde, ankeret havner i midten
-    const s = pv.width / Math.max(fd.f.w, fd.f.h);
     pg.imageSmoothingEnabled = true;
-    pg.drawImage(fd.sheet, fd.f.x, fd.f.y, fd.f.w, fd.f.h, pv.width / 2 - fd.ax * s, pv.height / 2 - fd.ay * s, fd.f.w * s, fd.f.h * s);
+    // Samme regel som importskriptet: ruten skaleres til full bredde, ankeret havner i midten
+    drawFrameTo(pg, pv.width, name, i, 1);
+    // Myk blanding: neste bilde tones inn over det nåværende, slik appen gjør
+    if (blendNext) drawFrameTo(pg, pv.width, blendNext[0], blendNext[1], blendNext[2]);
   }
   function tick(t) {
     const dt = lastT ? t - lastT : 0; lastT = t;
@@ -461,13 +499,142 @@ textarea#jsonOut { width: 100%; height: 120px; background: #0d0e16; color: var(-
         [n, i] = seq[seqPos];
         if (n === clipName) { frameIdx = i; drawEditor(); refreshTimelineSel(); updateInfo(); }
       }
-      drawPreview(n, i);
+      const cur = frameData(n, i);
+      const [nn, ni] = seq[(seqPos + 1) % seq.length];
+      drawPreview(n, i, $("blend").checked && nn === n ? [nn, ni, Math.min(1, seqTime / cur.d)] : null);
     } else {
       drawPreview(clipName, frameIdx);
     }
     requestAnimationFrame(tick);
   }
   function refreshTimelineSel() { document.querySelectorAll(".thumb").forEach((c) => c.classList.toggle("on", +c.dataset.i === frameIdx)); }
+
+  // ---------- Automatikk: sporing av anker og hakk-måling ----------
+  // Alle bilder gjengis i et felles normalisert rom (N × N), uavhengig av rutestørrelse.
+  const N = 128;
+  const normCache = new Map();
+  function normData(name, i) {
+    const key = name + "#" + i;
+    if (normCache.has(key)) return normCache.get(key);
+    const fd = frameData(name, i);
+    const side = Math.max(fd.f.w, fd.f.h);
+    const c = document.createElement("canvas"); c.width = N; c.height = N;
+    const g = c.getContext("2d", { willReadFrequently: true });
+    g.drawImage(fd.sheet, fd.f.x, fd.f.y, fd.f.w, fd.f.h, 0, 0, fd.f.w * N / side, fd.f.h * N / side);
+    const out = { px: g.getImageData(0, 0, N, N).data, k: N / side };
+    normCache.set(key, out);
+    return out;
+  }
+  // Finn forskyvningen som får lappen rundt (ax, ay) i bilde A til å passe best i bilde B.
+  function match(A, ax, ay, B, P = 14, R = 18) {
+    let best = Infinity, bx = 0, by = 0;
+    for (let dy = -R; dy <= R; dy++) for (let dx = -R; dx <= R; dx++) {
+      let sum = 0, w = 0;
+      for (let y = -P; y <= P; y += 2) for (let x = -P; x <= P; x += 2) {
+        const xa = Math.round(ax + x), ya = Math.round(ay + y), xb = xa + dx, yb = ya + dy;
+        if (xa < 0 || ya < 0 || xa >= N || ya >= N || xb < 0 || yb < 0 || xb >= N || yb >= N) { sum += 255; w++; continue; }
+        const ia = (ya * N + xa) * 4, ib = (yb * N + xb) * 4;
+        const aa = A[ia + 3], ab = B[ib + 3];
+        if (aa < 20 && ab < 20) continue;
+        sum += Math.abs(A[ia] * aa - B[ib] * ab) / 255 + Math.abs(A[ia + 1] * aa - B[ib + 1] * ab) / 255
+             + Math.abs(A[ia + 2] * aa - B[ib + 2] * ab) / 255 + Math.abs(aa - ab);
+        w++;
+      }
+      const score = w ? sum / w + 0.15 * Math.hypot(dx, dy) : Infinity;
+      if (score < best) { best = score; bx = dx; by = dy; }
+    }
+    return [bx, by];
+  }
+  function anchorNorm(name, i) { const fd = frameData(name, i), k = normData(name, i).k; return [fd.ax * k, fd.ay * k]; }
+  function setAnchorNorm(name, i, x, y) {
+    const k = normData(name, i).k;
+    edits[name] = edits[name] || [];
+    edits[name][i] = Object.assign({}, edits[name][i], { ax: Math.round(x / k), ay: Math.round(y / k) });
+  }
+  function autoTrack(name) {
+    const c = meta.clips[name], n = frames(name).length;
+    // Startpunkt: overgangens første bilde spores fra løkka den kommer fra (dens første bilde)
+    let [px, py] = anchorNorm(name, 0);
+    if (!c.loop && c.from && meta.clips[c.from]) {
+      const [fx, fy] = anchorNorm(c.from, 0);
+      const [dx, dy] = match(normData(c.from, 0).px, fx, fy, normData(name, 0).px);
+      px = fx + dx; py = fy + dy;
+      setAnchorNorm(name, 0, px, py);
+    }
+    const pts = [[px, py]];
+    for (let i = 1; i < n; i++) {
+      const [dx, dy] = match(normData(name, i - 1).px, pts[i - 1][0], pts[i - 1][1], normData(name, i).px);
+      pts.push([pts[i - 1][0] + dx, pts[i - 1][1] + dy]);
+    }
+    // Lukk sløyfa: siste bilde skal føre tilbake til første (løkke) eller til målløkka (overgang)
+    let target = null;
+    if (c.loop) {
+      const [dx, dy] = match(normData(name, n - 1).px, pts[n - 1][0], pts[n - 1][1], normData(name, 0).px);
+      target = [pts[n - 1][0] + dx - pts[0][0], pts[n - 1][1] + dy - pts[0][1]]; // drift over runden
+      for (let i = 1; i < n; i++) { pts[i][0] -= target[0] * i / n; pts[i][1] -= target[1] * i / n; }
+    }
+    for (let i = 1; i < n; i++) setAnchorNorm(name, i, pts[i][0], pts[i][1]);
+    lsSet(packKey, edits);
+    return target ? Math.hypot(target[0], target[1]) / normData(name, 0).k : 0;
+  }
+  // Hakk: hvor mye endrer bildet seg fra forrige, med ankrene stilt over hverandre
+  function diffAligned(name, i, j) {
+    const A = normData(name, i).px, B = normData(name, j).px;
+    const [ax, ay] = anchorNorm(name, i), [bx, by] = anchorNorm(name, j);
+    const ox = Math.round(bx - ax), oy = Math.round(by - ay);
+    let sum = 0, cnt = 0;
+    for (let y = 0; y < N; y += 2) for (let x = 0; x < N; x += 2) {
+      const xb = x + ox, yb = y + oy;
+      const aa = A[(y * N + x) * 4 + 3];
+      const ab = (xb >= 0 && yb >= 0 && xb < N && yb < N) ? B[(yb * N + xb) * 4 + 3] : 0;
+      if (aa < 20 && ab < 20) continue;
+      sum += Math.abs(aa - ab) / 255; cnt++;
+    }
+    return cnt ? sum / cnt : 0;
+  }
+  let jumpReport = null;
+  function analyse(name) {
+    const c = meta.clips[name], n = frames(name).length;
+    const scores = [];
+    for (let i = 0; i < n; i++) {
+      if (i === 0) scores.push(c.loop ? diffAligned(name, n - 1, 0) : 0);
+      else scores.push(diffAligned(name, i - 1, i));
+    }
+    const sorted = scores.filter((v, i) => c.loop || i > 0).slice().sort((a, b) => a - b);
+    const med = sorted[Math.floor(sorted.length / 2)] || 0;
+    const bad = scores.map((v, i) => (v > med * 1.6 && v > 0.08 ? i : -1)).filter((i) => i >= 0);
+    return { clip: name, scores, med, max: Math.max(...scores), bad };
+  }
+  function showFindings(reports) {
+    const ul = $("findings"); ul.innerHTML = "";
+    const items = [];
+    for (const r of reports) for (const i of r.bad) items.push([r, i]);
+    if (!items.length) {
+      const li = document.createElement("li"); li.textContent = "Ingen bilder skiller seg tydelig ut. Hakking skyldes da mest få bilder per runde."; ul.appendChild(li); return;
+    }
+    items.sort((a, b) => b[0].scores[b[1]] / (b[0].med || 1) - a[0].scores[a[1]] / (a[0].med || 1));
+    for (const [r, i] of items.slice(0, 12)) {
+      const n = frames(r.clip).length, prev = i === 0 ? n : i;
+      const li = document.createElement("li"); li.className = "bad"; li.tabIndex = 0;
+      li.textContent = `${r.clip.replaceAll("_", " ")}: bilde ${prev} → ${i + 1} endrer seg ${(r.scores[i] / (r.med || 1)).toFixed(1)}× mer enn vanlig. Sjekk ankeret, eller gi bilde ${prev} litt kortere tid.`;
+      li.addEventListener("click", () => { if (clipName !== r.clip) selectClip(r.clip); frameIdx = i; jumpReport = r; refreshAll(); });
+      ul.appendChild(li);
+    }
+  }
+  $("autoClip").onclick = () => {
+    const drift = autoTrack(clipName); normCache.clear(); jumpReport = analyse(clipName); refreshAll(); showFindings([jumpReport]);
+    setStatus(`Auto-anker for ${clipName} er ferdig` + (drift > 1 ? ` (rettet ${drift.toFixed(0)} px drift over runden).` : "."), "ok");
+  };
+  $("autoAll").onclick = () => {
+    const loops = clipNames.filter((n) => meta.clips[n].loop), trans = clipNames.filter((n) => !meta.clips[n].loop);
+    [...loops, ...trans].forEach((n) => autoTrack(n));
+    normCache.clear();
+    const reports = clipNames.map(analyse); jumpReport = reports.find((r) => r.clip === clipName);
+    refreshAll(); showFindings(reports);
+    setStatus("Auto-anker er satt for alle klipp. Se over listen med hakk.", "ok");
+  };
+  $("findJumps").onclick = () => { jumpReport = analyse(clipName); refreshAll(); showFindings([jumpReport]); };
+  $("findAll").onclick = () => { const reports = clipNames.map(analyse); jumpReport = reports.find((r) => r.clip === clipName); refreshAll(); showFindings(reports); };
 
   // ---------- Info, export ----------
   function updateInfo() {

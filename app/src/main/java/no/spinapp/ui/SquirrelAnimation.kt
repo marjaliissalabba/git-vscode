@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.sp
 fun SquirrelAnimation(
     ftp: Int, watts: Int?, rpm: Int?, paused: Boolean, size: Dp = 64.dp, modifier: Modifier = Modifier,
     showLabel: Boolean = false,
+    blend: Boolean = AppState.squirrelBlend,
 ) {
     val context = LocalContext.current
     // Bildene (128 stk.) lastes i bakgrunnen og huskes for resten av appens levetid
@@ -54,6 +55,10 @@ fun SquirrelAnimation(
     val f by rememberUpdatedState(ftp)
     val p by rememberUpdatedState(paused)
     var shown by remember { mutableStateOf(SquirrelClip.IDLE to 0) }
+    // Myk blanding: neste bilde tones inn over det viste, så 8 tegninger per runde ikke ser hakkete ut
+    val bl by rememberUpdatedState(blend)
+    var next by remember { mutableStateOf<Int?>(null) }
+    var alpha by remember { mutableStateOf(0f) }
     var mode by remember { mutableStateOf(SquirrelMode.IDLE) }
 
     LaunchedEffect(Unit) {
@@ -65,6 +70,7 @@ fun SquirrelAnimation(
                     val target = director.update(dt, w, r, f, p)
                     mode = target
                     shown = player.advance(dt, target, director.animRpm)
+                    if (bl) { next = player.nextFrame; alpha = player.progress.toFloat() } else next = null
                 }
                 last = t
             }
@@ -74,12 +80,24 @@ fun SquirrelAnimation(
     val list = frames[shown.first]
     androidx.compose.foundation.layout.Column(modifier, horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally) {
         if (!list.isNullOrEmpty()) {
-            Image(
-                bitmap = list[shown.second.coerceIn(0, list.lastIndex)],
-                contentDescription = null,
-                filterQuality = FilterQuality.High, // tegnet stil: myk skalering
-                modifier = Modifier.size(size),
-            )
+            androidx.compose.foundation.layout.Box(Modifier.size(size)) {
+                Image(
+                    bitmap = list[shown.second.coerceIn(0, list.lastIndex)],
+                    contentDescription = null,
+                    filterQuality = FilterQuality.High, // tegnet stil: myk skalering
+                    modifier = Modifier.size(size),
+                )
+                val n = next
+                if (blend && n != null && n in list.indices && alpha > 0.02f) {
+                    Image(
+                        bitmap = list[n],
+                        contentDescription = null,
+                        filterQuality = FilterQuality.High,
+                        alpha = alpha,
+                        modifier = Modifier.size(size),
+                    )
+                }
+            }
         } else {
             androidx.compose.foundation.layout.Spacer(Modifier.size(size))
         }

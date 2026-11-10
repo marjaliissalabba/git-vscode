@@ -130,4 +130,24 @@ class SquirrelTest {
         // Uten timing for klippet: standard
         assertEquals(100.0, p.frameDurationMs(SquirrelClip.CLIMB, 65, 3), 0.01)
     }
+
+    @Test
+    fun blendProgress() {
+        val p = SquirrelPlayer()
+        val d = p.frameDurationMs(SquirrelClip.IDLE, 0)
+        p.advance(d * 0.5, SquirrelMode.IDLE, 0)
+        assertEquals(0, p.frame)
+        assertEquals(0.5, p.progress, 0.01)
+        assertEquals(1, p.nextFrame)
+        // Siste bilde i en løkke blandes mot første
+        repeat(7) { p.advance(d, SquirrelMode.IDLE, 0) }
+        assertEquals(7, p.frame)
+        assertEquals(0, p.nextFrame)
+        // Siste bilde i en overgang blandes ikke
+        p.advance(1.0, SquirrelMode.RUN, 0)
+        assertEquals(SquirrelClip.IDLE_TO_SLOW_RUN, p.clip)
+        repeat(5) { p.advance(p.frameDurationMs(p.clip, 0), SquirrelMode.RUN, 0) }
+        assertEquals(5, p.frame)
+        assertEquals(null, p.nextFrame)
+    }
 }

@@ -802,12 +802,14 @@ private fun SquirrelCard(ftp: Int) {
     SpinCard {
         ToggleRow("Vis ekornet under økta", "Animasjonen til venstre for måleren.", enabled) { enabled = it; AppState.squirrelEnabled = it }
         if (!enabled) return@SpinCard
+        var blend by remember { mutableStateOf(AppState.squirrelBlend) }
+        ToggleRow("Myk blanding mellom bilder", "Toner hvert bilde over i det neste, så ekornet hakker mindre.", blend) { blend = it; AppState.squirrelBlend = it }
         Spacer(Modifier.height(6.dp))
         Muted("Ekornet ved måleren viser hvordan du sykler: står og puster, løper, løper fort og sprettende, eller løper rett opp (klatrer). Prøv verdier her:", 14, C.n300)
         Spacer(Modifier.height(10.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(84.dp).clip(RoundedCornerShape(10.dp)).background(C.n900), contentAlignment = Alignment.Center) {
-                key(th) { SquirrelAnimation(ftp, ftp * testPct / 100, testRpm, paused = false, size = 72.dp) }
+                key(th) { SquirrelAnimation(ftp, ftp * testPct / 100, testRpm, paused = false, size = 72.dp, blend = blend) }
             }
             Column(Modifier.weight(1f).padding(start = 14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(
