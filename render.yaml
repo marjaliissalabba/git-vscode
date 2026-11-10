@@ -1,0 +1,15 @@
+# Render Blueprint: gir appen en fast, offentlig https-adresse.
+# Render > New > Blueprint > velg dette repoet.
+services:
+  - type: web
+    name: lastbors-norden
+    runtime: node
+    plan: free
+    buildCommand: echo "Ingen avhengigheter å installere"
+    startCommand: npm start
+    healthCheckPath: /api/meta
+    envVars:
+      - key: NODE_VERSION
+        value: 22.13.0
+      - key: COOKIE_SECURE
+        value: "true"

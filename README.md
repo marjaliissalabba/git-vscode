@@ -23,6 +23,21 @@ Demokontoer (passord `demo1234`):
 | `fjordbil@demo.no` | Transportør med løyve til kontroll. Kan ikke by |
 | `admin@demo.no` | Dokumentkontroll, sperring av firma og **testpanel for integrasjoner** |
 
+## Teste uten å installere noe
+
+**GitHub Codespaces** (kjører i nettleseren):
+1. Gå til repoet på GitHub og velg branchen med appen.
+2. Trykk **Code › Codespaces › Create codespace on …**.
+3. Appen starter av seg selv (`npm start`), og port 3000 åpnes i en ny fane.
+4. Vil du åpne appen på mobilen: gå til fanen **Ports**, høyreklikk port 3000 og velg **Port Visibility › Public**. Adressen ser slik ut: `https://<navn>-3000.app.github.dev`.
+
+**Render** (fast offentlig adresse):
+1. Logg inn på render.com med GitHub.
+2. Trykk **New › Blueprint**, velg dette repoet og branchen. Da brukes `render.yaml`.
+3. Du får en adresse som `https://lastbors-norden.onrender.com`.
+
+På gratisplanen sovner appen etter 15 minutter uten bruk og bruker da et halvt minutt på å våkne. Databasen nullstilles ved omstart, og demodataene legges inn på nytt.
+
 ## Teste koblingene (Brønnøysund m.fl.)
 
 Integrasjonene kjører i **simulert modus** som standard, slik at du kan teste uten nett og uten avtaler.
