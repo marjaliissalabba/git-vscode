@@ -798,7 +798,7 @@ private fun SquirrelCard(ftp: Int) {
     fun save(t: no.spinapp.core.SquirrelThresholds) { th = t; AppState.squirrelThresholds = t }
 
     SpinCard {
-        Muted("Ekornet ved måleren viser hvordan du sykler: står og puster, løper, løper fort og sprettende, eller klatrer. Prøv verdier her:", 14, C.n300)
+        Muted("Ekornet ved måleren viser hvordan du sykler: står og puster, løper, løper fort og sprettende, eller løper rett opp (klatrer). Prøv verdier her:", 14, C.n300)
         Spacer(Modifier.height(10.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(84.dp).clip(RoundedCornerShape(10.dp)).background(C.n900), contentAlignment = Alignment.Center) {
@@ -824,21 +824,20 @@ private fun SquirrelCard(ftp: Int) {
         }
         if (open) {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Muted("Står og puster", 13, C.accent300)
-                MiniStepper("under rpm", th.idleRpm, 5) { save(th.copy(idleRpm = it.coerceIn(0, 60))) }
-                MiniStepper("og under % FTP", th.idlePct, 5) { save(th.copy(idlePct = it.coerceIn(0, 100))) }
-                Muted("Løper fort", 13, C.accent300)
-                MiniStepper("fra rpm", th.sprintRpm, 1) { save(th.copy(sprintRpm = it.coerceIn(40, 140))) }
-                MiniStepper("og fra % FTP", th.sprintPct, 5) { save(th.copy(sprintPct = it.coerceIn(0, 200))) }
-                MiniStepper("eller fra % FTP", th.sprintAltPct, 5) { save(th.copy(sprintAltPct = it.coerceIn(0, 300))) }
-                MiniStepper("med minst rpm", th.sprintAltRpm, 1) { save(th.copy(sprintAltRpm = it.coerceIn(30, 140))) }
-                MiniStepper("slutter under rpm", th.sprintExitRpm, 1) { save(th.copy(sprintExitRpm = it.coerceIn(30, 140))) }
-                MiniStepper("og under % FTP", th.sprintExitPct, 5) { save(th.copy(sprintExitPct = it.coerceIn(0, 300))) }
-                Muted("Klatrer", 13, C.accent300)
-                MiniStepper("fra % FTP", th.climbPct, 5) { save(th.copy(climbPct = it.coerceIn(0, 300))) }
-                MiniStepper("og høyst rpm", th.climbMaxRpm, 1) { save(th.copy(climbMaxRpm = it.coerceIn(20, 120))) }
-                MiniStepper("slutter under % FTP", th.climbExitPct, 5) { save(th.copy(climbExitPct = it.coerceIn(0, 300))) }
-                MiniStepper("eller over rpm", th.climbExitRpm, 1) { save(th.copy(climbExitRpm = it.coerceIn(20, 140))) }
+                Muted("Står og puster: pause, eller kadens under", 13, C.accent300)
+                MiniStepper("rpm", th.idleRpm, 5) { save(th.copy(idleRpm = it.coerceIn(0, 60))) }
+                Muted("Oppover (klatrer): mye kraft per tråkk", 13, C.accent300)
+                MiniStepper("minst % av FTP", th.climbPct, 5) { save(th.copy(climbPct = it.coerceIn(0, 300))) }
+                MiniStepper("og høyst rpm", th.climbMaxRpm, 1) { save(th.copy(climbMaxRpm = it.coerceIn(20, 140))) }
+                MiniStepper("slutter under % av FTP", th.climbExitPct, 5) { save(th.copy(climbExitPct = it.coerceIn(0, 300))) }
+                MiniStepper("eller over rpm", th.climbExitRpm, 1) { save(th.copy(climbExitRpm = it.coerceIn(20, 160))) }
+                Muted("Hoppende løp: høy kadens", 13, C.accent300)
+                MiniStepper("minst rpm", th.sprintRpm, 1) { save(th.copy(sprintRpm = it.coerceIn(40, 160))) }
+                MiniStepper("eller minst % av FTP", th.sprintAltPct, 5) { save(th.copy(sprintAltPct = it.coerceIn(0, 300))) }
+                MiniStepper("med minst rpm", th.sprintAltRpm, 1) { save(th.copy(sprintAltRpm = it.coerceIn(30, 160))) }
+                MiniStepper("slutter under rpm", th.sprintExitRpm, 1) { save(th.copy(sprintExitRpm = it.coerceIn(30, 160))) }
+                MiniStepper("og under % av FTP", th.sprintExitPct, 5) { save(th.copy(sprintExitPct = it.coerceIn(0, 300))) }
+                Muted("Løper: alt annet. Farten følger kadensen (én runde per pedalomdreining).", 12)
                 LinkText("Tilbakestill til standard") { save(no.spinapp.core.SquirrelThresholds()) }
             }
         }

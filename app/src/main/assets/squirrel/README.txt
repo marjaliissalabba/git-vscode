@@ -23,3 +23,7 @@ appens regler bytter til klatring; climb_loop går deretter kontinuerlig fram og
 Når appens regler sier at klatringen er over, spilles climb_over_crest_to_run én gang
 før vanlig løping. FTP/RPM alene kan bare gi en visuell heuristikk for bakketopp; bruk
 rutehelling eller intervallstatus fra appen dersom slike data finnes.
+
+ENDRINGER I APPEN
+climb_run_vertical/ er laget ved å snu sprint_bouncy 90° mot klokka, slik at klatringen
+er hoppende løp rett opp. climb_loop/ brukes ikke lenger.

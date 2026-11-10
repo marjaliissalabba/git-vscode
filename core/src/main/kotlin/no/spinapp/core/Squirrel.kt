@@ -3,28 +3,24 @@ package no.spinapp.core
 /**
  * Ekornet ved måleren. Målingene (watt/FTP og rpm) velger tilstand; overganger
  * mellom løping og klatring spilles én gang, de andre klippene looper.
- * Startverdiene kommer fra spritepakkens control_rules.json og kan justeres.
+ * Startverdiene er foreløpige og kan justeres under Profil → Ekornet.
  */
 data class SquirrelThresholds(
-    /** Står og puster under denne kadensen … */
+    /** Står og puster under denne kadensen (eller når økta står på pause). */
     val idleRpm: Int = 20,
-    /** … og under denne andelen av FTP. */
-    val idlePct: Int = 20,
-    /** Sprint: rpm ≥ [sprintRpm] og ≥ [sprintPct] % av FTP … */
-    val sprintRpm: Int = 85,
-    val sprintPct: Int = 35,
-    /** … eller ≥ [sprintAltPct] % av FTP og rpm ≥ [sprintAltRpm]. */
-    val sprintAltPct: Int = 100,
-    val sprintAltRpm: Int = 65,
-    /** Sprint slutter når rpm < [sprintExitRpm] og under [sprintExitPct] %. */
-    val sprintExitRpm: Int = 78,
-    val sprintExitPct: Int = 90,
-    /** Klatring: ≥ [climbPct] % av FTP og rpm ≤ [climbMaxRpm]. */
-    val climbPct: Int = 85,
-    val climbMaxRpm: Int = 65,
-    /** Klatring slutter når under [climbExitPct] % eller rpm > [climbExitRpm]. */
-    val climbExitPct: Int = 78,
-    val climbExitRpm: Int = 72,
+    /** Oppover (klatring) = mye kraft per tråkk: minst [climbPct] % av FTP og høyst [climbMaxRpm] rpm. */
+    val climbPct: Int = 75,
+    val climbMaxRpm: Int = 75,
+    /** Klatringen slutter under [climbExitPct] % av FTP eller over [climbExitRpm] rpm. */
+    val climbExitPct: Int = 70,
+    val climbExitRpm: Int = 82,
+    /** Hoppende løp = høy kadens: minst [sprintRpm] rpm, eller minst [sprintAltPct] % av FTP med minst [sprintAltRpm] rpm. */
+    val sprintRpm: Int = 100,
+    val sprintAltPct: Int = 120,
+    val sprintAltRpm: Int = 90,
+    /** Hoppende løp slutter under [sprintExitRpm] rpm og under [sprintExitPct] % av FTP. */
+    val sprintExitRpm: Int = 95,
+    val sprintExitPct: Int = 115,
 )
 
 enum class SquirrelMode { IDLE, RUN, SPRINT, CLIMB }
@@ -34,7 +30,7 @@ enum class SquirrelClip(val folder: String, val loop: Boolean, val frames: Int =
     IDLE("idle", true),
     RUN("run", true),
     SPRINT("sprint_bouncy", true),
-    CLIMB("climb_loop", true),
+    CLIMB("climb_run_vertical", true),
     RUN_TO_CLIMB("run_to_climb", false),
     CLIMB_TO_RUN("climb_over_crest_to_run", false),
 }
@@ -49,13 +45,13 @@ class SquirrelStateMachine(var thresholds: SquirrelThresholds = SquirrelThreshol
         val r = rpm ?: 0
         val pct = if (ftp > 0 && watts != null) watts * 100.0 / ftp else 0.0
 
-        if (paused || (r < t.idleRpm && pct < t.idlePct)) {
+        if (paused || r < t.idleRpm) {
             mode = SquirrelMode.IDLE
             return mode
         }
         val climbEnter = pct >= t.climbPct && r <= t.climbMaxRpm
         val climbExit = pct < t.climbExitPct || r > t.climbExitRpm
-        val sprintEnter = (r >= t.sprintRpm && pct >= t.sprintPct) || (pct >= t.sprintAltPct && r >= t.sprintAltRpm)
+        val sprintEnter = r >= t.sprintRpm || (pct >= t.sprintAltPct && r >= t.sprintAltRpm)
         val sprintExit = r < t.sprintExitRpm && pct < t.sprintExitPct
 
         mode = when (mode) {
@@ -91,15 +87,16 @@ class SquirrelPlayer {
     private var shownMode = SquirrelMode.IDLE
     private var elapsedMs = 0.0
 
-    /** Varighet per bilde i ms. Løping følger kadensen (30–110 rpm → 160–80 ms). */
+    /**
+     * Varighet per bilde i ms. Løp, hoppende løp og klatring går én runde per pedalomdreining,
+     * så farten følger kadensen: 60 rpm ≈ 167 ms, 90 rpm ≈ 111 ms, 116 rpm ≈ 86 ms per bilde.
+     */
     fun frameDurationMs(c: SquirrelClip, rpm: Int?): Double = when (c) {
         SquirrelClip.IDLE -> 250.0
-        SquirrelClip.RUN -> {
-            val r = (rpm ?: 30).coerceIn(30, 110)
-            160.0 - (r - 30) / 80.0 * 80.0
+        SquirrelClip.RUN, SquirrelClip.SPRINT, SquirrelClip.CLIMB -> {
+            val r = (rpm ?: 60).coerceIn(30, 160)
+            (60000.0 / (r * c.frames)).coerceIn(50.0, 250.0)
         }
-        SquirrelClip.SPRINT -> 85.0
-        SquirrelClip.CLIMB -> 130.0
         SquirrelClip.RUN_TO_CLIMB, SquirrelClip.CLIMB_TO_RUN -> 120.0
     }
 
