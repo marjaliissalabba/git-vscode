@@ -84,7 +84,7 @@ fun categoryOf(w: Workout): String = when {
     CustomWorkoutStore.isCustom(w.id) -> "Mine"
     w.id in setOf("grunn45", "restitusjon") -> "Utholdenhet"
     w.id in setOf("terskel3x8", "pyramide") -> "Terskel"
-    w.id == "ftptest" -> "Test"
+    w.id == "ftptest" || w.id == "ekorntest" -> "Test"
     else -> "VO2maks"
 }
 

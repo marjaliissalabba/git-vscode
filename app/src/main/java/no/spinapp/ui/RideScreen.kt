@@ -319,13 +319,18 @@ fun RideScreen(activity: MainActivity, workout: Workout, onFinished: (RideSummar
 
         StandBanner(state.stand, showSit = state.elapsedSec < sitBannerUntil)
 
-        // 6. Måleren
+        // 6. Måleren. Målingene kommer ca. én gang i sekundet; tallene, pila og ekornets fart
+        // glides mellom dem så det ikke hakker.
+        val smoothW by androidx.compose.animation.core.animateFloatAsState(
+            (state.powerW ?: 0).toFloat(), androidx.compose.animation.core.tween(900, easing = androidx.compose.animation.core.LinearEasing), label = "watt")
+        val smoothRpm by androidx.compose.animation.core.animateFloatAsState(
+            (state.cadenceRpm ?: 0).toFloat(), androidx.compose.animation.core.tween(900, easing = androidx.compose.animation.core.LinearEasing), label = "rpm")
         PowerGauge(
             ftp = ftp,
-            powerW = state.powerW,
+            powerW = state.powerW?.let { kotlin.math.round(smoothW).toInt() },
             targetLowPct = seg?.powerLowPct,
             targetHighPct = seg?.powerHighPct,
-            cadence = state.cadenceRpm,
+            cadence = state.cadenceRpm?.let { kotlin.math.round(smoothRpm).toInt() },
             cadenceLow = seg?.cadenceLow,
             cadenceHigh = seg?.cadenceHigh,
             cadenceStatus = state.cadenceStatus,

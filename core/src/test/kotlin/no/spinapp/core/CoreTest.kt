@@ -148,7 +148,7 @@ class WorkoutTest {
     @Test
     fun libraryWorkoutsAreReasonable() {
         for (w in WorkoutLibrary.all) {
-            assertTrue(w.durationSec in 20 * 60..60 * 60, "${w.name} varer ${w.durationSec / 60} min")
+            assertTrue(w.durationSec in 10 * 60..60 * 60, "${w.name} varer ${w.durationSec / 60} min")
             assertTrue(w.segments.none { it.isWarmup }, "${w.name} skal ikke ha oppvarming")
             assertTrue(w.segments.all { it.powerLowPct <= it.powerHighPct && it.cadenceLow <= it.cadenceHigh })
         }

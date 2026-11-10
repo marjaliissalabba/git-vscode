@@ -185,7 +185,21 @@ object WorkoutLibrary {
         cooldown(10)
     }
 
-    val all = listOf(endurance, threshold, vo2, climbSprint, pyramid, recovery, ftpTest)
+    /** Kort testøkt som går gjennom alle ekorn-tilstandene og overgangene. */
+    val squirrelTest = workout("ekorntest", "Ekorn-test", "12 min som viser alle ekorn-tilstandene: står, løper, hoppende løp, klatring og overgangene.") {
+        seg("Stå stille – ikke tråkk", 0.75, 0, 5, 0..5)
+        seg("Løp – jevnt", 1.5, 60, 70, 85..95)
+        seg("Hoppende løp – rask fot", 1.5, 65, 75, 105..115)
+        seg("Løp", 1.0, 60, 70, 85..95)
+        seg("Klatring – tungt", 2.0, 85, 95, 60..68)
+        seg("Over toppen – løp", 1.5, 55, 65, 85..95)
+        seg("Sprint", 1.0, 140, 160, 105..115)
+        seg("Klatring igjen", 1.5, 90, 100, 60..68)
+        seg("Løp ut", 1.0, 55, 65, 85..95)
+        seg("Stopp – ikke tråkk", 0.75, 0, 5, 0..5)
+    }
+
+    val all = listOf(endurance, threshold, vo2, climbSprint, pyramid, recovery, ftpTest, squirrelTest)
 
     fun byId(id: String) = all.firstOrNull { it.id == id }
 }
