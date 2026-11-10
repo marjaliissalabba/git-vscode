@@ -47,7 +47,7 @@ fun SquirrelAnimation(
         value = SquirrelFrames.cached!!
     }
     val director = remember { SquirrelDirector(AppState.squirrelThresholds) }
-    val player = remember { SquirrelPlayer() }
+    val player = remember { SquirrelPlayer(loadSquirrelTimings(context)) }
 
     val w by rememberUpdatedState(watts)
     val r by rememberUpdatedState(rpm)
@@ -96,6 +96,15 @@ fun SquirrelAnimation(
         }
     }
 }
+
+/** Varighet per bilde fra Ekorn Sprite-studio (assets/squirrel/timing.json), om den finnes. */
+private fun loadSquirrelTimings(context: Context): Map<SquirrelClip, DoubleArray> = runCatching {
+    val j = org.json.JSONObject(context.assets.open("squirrel/timing.json").bufferedReader().use { it.readText() })
+    SquirrelClip.entries.mapNotNull { c ->
+        val a = j.optJSONArray(c.folder) ?: return@mapNotNull null
+        c to DoubleArray(a.length()) { a.optDouble(it, 0.0) }
+    }.toMap()
+}.getOrDefault(emptyMap())
 
 private object SquirrelFrames { var cached: Map<SquirrelClip, List<ImageBitmap>>? = null }
 

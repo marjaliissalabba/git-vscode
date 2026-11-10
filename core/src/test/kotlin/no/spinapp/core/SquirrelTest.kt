@@ -110,4 +110,24 @@ class SquirrelTest {
         run(10.0, 130, 92)
         assertEquals(90, d.animRpm)
     }
+
+    @Test
+    fun timingsFromStudio() {
+        val p = SquirrelPlayer(mapOf(
+            SquirrelClip.SLOW_RUN to doubleArrayOf(50.0, 150.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0),
+            SquirrelClip.IDLE to doubleArrayOf(300.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0),
+        ))
+        // Løp: rytme rundt kadensfarten (100 ms ved 85 rpm, snitt 100)
+        assertEquals(50.0, p.frameDurationMs(SquirrelClip.SLOW_RUN, 85, 0), 0.01)
+        assertEquals(150.0, p.frameDurationMs(SquirrelClip.SLOW_RUN, 85, 1), 0.01)
+        // Høyere kadens: raskere, men samme rytme (bilde 2 tre ganger så langt som bilde 1)
+        val a0 = p.frameDurationMs(SquirrelClip.SLOW_RUN, 120, 0)
+        val a1 = p.frameDurationMs(SquirrelClip.SLOW_RUN, 120, 1)
+        kotlin.test.assertTrue(a0 < 50.0)
+        assertEquals(3.0, a1 / a0, 0.001)
+        // Hvile: millisekundene brukes direkte
+        assertEquals(300.0, p.frameDurationMs(SquirrelClip.IDLE, 0, 0), 0.01)
+        // Uten timing for klippet: standard
+        assertEquals(100.0, p.frameDurationMs(SquirrelClip.CLIMB, 65, 3), 0.01)
+    }
 }

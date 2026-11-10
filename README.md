@@ -33,6 +33,11 @@ Prøv kildene i denne rekkefølgen: Bluetooth, så ANT+, så kamera.
 - **Neste intervall ⏭** og **Hopp over oppvarming** på øktskjermen.
 - **Øktbygger:** «+ Lag ny økt», eller «Lag egen versjon» av en ferdig økt. Endre navn, tid, % av FTP, kadens og ståperiode per intervall, kopier, flytt og slett. Egne økter lagres bare på telefonen.
 
+## Ekornet og Sprite-studio
+
+- `tools/sprite-studio/index.html` er et redigeringsverktøy for ekornets spritepakke (ankerpunkt og varighet per bilde, løkspeil, forhåndsvisning i appstørrelse). Det lagrer en oppdatert `animations.json`.
+- `python3 tools/import_squirrel_sprites.py <mappe>` tar pakken inn i appen: bildene plasseres etter ankerpunktet og varighetene skrives til `assets/squirrel/timing.json`.
+
 ## Personvern og lagring
 
 - Ingen konto og ingen innlogging i SpinApp. Spotifys innloggingsbibliotek gir appen internettillatelse, men den brukes bare til Spotify-innloggingen hvis Spotify-appen ikke kan ta den selv. Treningsdata sendes aldri noe sted.

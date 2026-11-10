@@ -165,7 +165,14 @@ class SquirrelDirector(thresholds: SquirrelThresholds = SquirrelThresholds()) {
  * ved hvert tilstandsbytte. En overgang spilles alltid ferdig; deretter velges neste
  * overgang fra tilstanden den endte i.
  */
-class SquirrelPlayer {
+class SquirrelPlayer(
+    /**
+     * Varighet i ms per bilde fra Ekorn Sprite-studio (timing.json). For hvile og overganger
+     * brukes tallene direkte; for løp og klatring er de rytme (relative lengder), mens
+     * kadensen styrer den samlede farten.
+     */
+    var timings: Map<SquirrelClip, DoubleArray> = emptyMap(),
+) {
     var clip = SquirrelClip.IDLE
         private set
     var frame = 0
@@ -178,7 +185,18 @@ class SquirrelPlayer {
      * rolig løp 10 bilder/s ved 85 rpm, raskt løp 16 bilder/s ved 105 rpm (≈ 18 ved 116 rpm),
      * klatring 10 bilder/s ved 65 rpm. Hvile 6 bilder/s, overganger 14 bilder/s.
      */
-    fun frameDurationMs(c: SquirrelClip, rpm: Int?): Double {
+    fun frameDurationMs(c: SquirrelClip, rpm: Int?, frame: Int = 0): Double {
+        val base = baseDurationMs(c, rpm)
+        val t = timings[c] ?: return base
+        if (t.isEmpty()) return base
+        val d = t[frame.coerceIn(0, t.lastIndex)]
+        return when (c) {
+            SquirrelClip.SLOW_RUN, SquirrelClip.FAST_RUN, SquirrelClip.CLIMB -> base * d / t.average()
+            else -> d
+        }.coerceAtLeast(10.0)
+    }
+
+    private fun baseDurationMs(c: SquirrelClip, rpm: Int?): Double {
         val r = (rpm ?: 0).toDouble()
         val fps = when (c) {
             SquirrelClip.IDLE -> 6.0
@@ -206,7 +224,7 @@ class SquirrelPlayer {
         if (clip.loop && target != shownMode) goTowards(target)
 
         elapsedMs += dtMs
-        var dur = frameDurationMs(clip, rpm)
+        var dur = frameDurationMs(clip, rpm, frame)
         while (elapsedMs >= dur) {
             elapsedMs -= dur
             if (frame < clip.frames - 1) {
@@ -218,7 +236,7 @@ class SquirrelPlayer {
                 shownMode = landed
                 if (target != landed) goTowards(target) else start(SquirrelClip.loopFor(landed))
             }
-            dur = frameDurationMs(clip, rpm)
+            dur = frameDurationMs(clip, rpm, frame)
         }
         return clip to frame
     }
