@@ -185,21 +185,112 @@ object WorkoutLibrary {
         cooldown(10)
     }
 
-    /** Kort testøkt som går gjennom alle figur-tilstandene. */
-    val squirrelTest = workout("ekorntest", "Figur-test", "12 min som viser alle tilstandene til figuren ved måleren: står, løper, løper fort og hopper, og klatrer.") {
-        seg("Stå stille – ikke tråkk", 0.75, 0, 5, 0..5)
-        seg("Løp – jevnt", 1.5, 60, 70, 85..95)
-        seg("Hoppende løp – rask fot", 1.5, 65, 75, 105..115)
-        seg("Løp", 1.0, 60, 70, 85..95)
-        seg("Klatring – tungt", 2.0, 85, 95, 60..68)
-        seg("Over toppen – løp", 1.5, 55, 65, 85..95)
-        seg("Sprint", 1.0, 140, 160, 105..115)
-        seg("Klatring igjen", 1.5, 90, 100, 60..68)
-        seg("Løp ut", 1.0, 55, 65, 85..95)
-        seg("Stopp – ikke tråkk", 0.75, 0, 5, 0..5)
+    // ---------- Forskningsbaserte økter (brukes også i treningsplanene, se TrainingPlans) ----------
+
+    /** NTNU/CERG 4×4 (Helgerud m.fl. 2007): 4 × 4 min på 90–95 % av makspuls, 3 min aktiv pause. */
+    val ntnu4x4 = workout("ntnu4x4", "NTNU 4×4",
+        "4 × 4 min hardt (90–95 % av makspuls ≈ 106–115 % av FTP) med 3 min aktiv pause. Kadensen varierer mellom dragene; drag 2 har en ståperiode.") {
+        seg("Rask fot", 1.0, 65, 75, 100..110)
+        seg("Rolig", 2.0, 55, 65, 85..95)
+        seg("Drag 1/4 – jevnt", 4.0, 106, 112, 90..100)
+        seg("Aktiv pause", 3.0, 55, 65, 85..95)
+        seg("Drag 2/4 – tungt, stå opp", 4.0, 106, 112, 75..85, stand = listOf(120 to 180))
+        seg("Aktiv pause", 3.0, 55, 65, 85..95)
+        seg("Drag 3/4 – rask fot", 4.0, 106, 112, 98..108)
+        seg("Aktiv pause", 3.0, 55, 65, 85..95)
+        seg("Drag 4/4 – sitt, gi litt ekstra", 3.0, 106, 112, 90..100)
+        seg("Drag 4/4 – siste minutt", 1.0, 112, 118, 95..105)
+        cooldown(6)
     }
 
-    val all = listOf(endurance, threshold, vo2, climbSprint, pyramid, recovery, ftpTest, squirrelTest)
+    /** NTNU/CERG 1×4 (Tjønna m.fl. 2013): ett drag på 4 min ved ca. 90 % av makspuls. */
+    val ntnu1x4 = workout("ntnu1x4", "NTNU 1×4",
+        "Ett eneste drag på 4 min (ca. 90 % av makspuls ≈ 105–112 % av FTP). Kort og effektivt.") {
+        seg("Rask fot", 1.0, 65, 75, 100..110)
+        seg("Rolig", 1.0, 55, 65, 85..95)
+        seg("Opptrapping", 2.0, 80, 90, 90..100)
+        seg("Rolig", 1.0, 55, 60, 85..95)
+        seg("Drag 4 min – jevnt", 2.0, 105, 110, 90..100)
+        seg("Drag – tyngre, stå opp", 1.0, 105, 110, 75..85, stand = listOf(0 to 40))
+        seg("Drag – siste minutt", 1.0, 108, 112, 95..105)
+        cooldown(5)
+    }
+
+    /** Rønnestad 30/15 (Rønnestad m.fl. 2020): 3 serier × 13 × (30 s hardt / 15 s rolig). */
+    val ronnestad3015 = workout("ronnestad3015", "Rønnestad 30/15",
+        "3 serier med 13 × 30 s hardt (ca. 120–130 % av FTP) og 15 s rolig, 3 min mellom seriene. Serie 1 middels kadens, serie 2 tyngre, serie 3 rask fot.") {
+        seg("Rask fot", 1.0, 65, 75, 100..110)
+        seg("Rolig", 2.0, 55, 65, 85..95)
+        val cad = listOf(92..102, 82..92, 100..110)
+        repeat(3) { serie ->
+            repeat(13) { i ->
+                seg("Serie $serie/3 · ${i}/13 hardt", 0.5, 118, 128, cad[serie - 1])
+                seg("Serie $serie/3 · rolig", 0.25, 45, 55, 85..95)
+            }
+            if (serie < 3) seg("Pause mellom seriene", 3.0, 50, 60, 85..95)
+        }
+        cooldown(6)
+    }
+
+    /** Seiler-gruppen 4×8 (Seiler m.fl. 2013): 4 × 8 min ved ca. 90 % av makspuls, 2 min pause. */
+    val seiler4x8 = workout("seiler4x8", "Seiler 4×8",
+        "4 × 8 min rett over terskel (ca. 100–106 % av FTP) med 2 min pause. Hvert drag: 5 min sittende, så 3 min tyngre med ståperiode.") {
+        seg("Rask fot", 1.0, 65, 75, 100..110)
+        seg("Rolig", 2.0, 55, 65, 85..95)
+        repeat(4) { i ->
+            seg("Drag $i/4 – sittende", 5.0, 100, 105, 88..98)
+            seg("Drag $i/4 – tyngre, stå opp", 3.0, 101, 106, 75..85, stand = listOf(60 to 120))
+            if (i < 4) seg("Pause", 2.0, 50, 60, 85..95)
+        }
+        cooldown(6)
+    }
+
+    /** Rolig sone 2 for polarisert trening (Seiler; Stöggl & Sperlich 2014). */
+    val zone2 = workout("sone2", "Sone 2 – 60 min",
+        "Rolig, lang økt i sone 2 (65–72 % av FTP) med skiftende kadens. Hoveddelen av polarisert trening.") {
+        repeat(3) {
+            seg("Jevn sone 2", 10.0, 65, 72, 85..95)
+            seg("Rask fot", 2.0, 62, 70, 100..110)
+            seg("Tung fot – stå opp midt i", 4.0, 68, 74, 70..80, stand = listOf(90 to 150))
+            seg("Jevn sone 2", 3.0, 65, 72, 85..95)
+        }
+        cooldown(3)
+    }
+
+    /** Sprintintervaller (Gibala-laben; Gist m.fl. 2014): 4–6 × 30 s alt du har, 4 min rolig. */
+    private fun sprints(n: Int) = workout("sit$n", "Sprint $n×30 s",
+        "$n × 30 s alt du har (sprint), 4 min helt rolig mellom. Svært hardt, men kort.") {
+        seg("Rask fot", 1.0, 65, 75, 100..110)
+        seg("Rolig", 2.0, 55, 65, 85..95)
+        seg("Kort åpner", 0.25, 120, 140, 100..110)
+        seg("Rolig", 2.0, 50, 60, 85..95)
+        repeat(n) { i ->
+            seg("Sprint $i/$n – alt du har", 0.5, 160, 220, 100..120)
+            if (i < n) seg("Helt rolig", 4.0, 40, 50, 75..90)
+        }
+        cooldown(6)
+    }
+    val sit4 = sprints(4)
+    val sit5 = sprints(5)
+    val sit6 = sprints(6)
+
+    /** Tabata (Tabata m.fl. 1996): 8 × 20 s svært hardt / 10 s pause. */
+    val tabata = workout("tabata", "Tabata 8×20/10",
+        "8 × 20 s svært hardt (ca. 150–170 % av FTP) med 10 s pause, så 15 min rolig sone 2.") {
+        seg("Rask fot", 1.0, 65, 75, 100..110)
+        seg("Rolig", 2.0, 55, 65, 85..95)
+        seg("Kort åpner", 0.25, 120, 140, 100..110)
+        seg("Rolig", 2.0, 50, 60, 85..95)
+        repeat(8) { i ->
+            seg("Tabata $i/8", 20 / 60.0, 150, 170, if (i % 2 == 1) 100..115 else 90..105)
+            seg("Pause", 10 / 60.0, 30, 45, 70..90)
+        }
+        seg("Rolig sone 2", 15.0, 62, 70, 85..95)
+        cooldown(3)
+    }
+
+    val all = listOf(endurance, threshold, vo2, climbSprint, pyramid, recovery, ftpTest,
+        ntnu4x4, ntnu1x4, ronnestad3015, seiler4x8, zone2, sit4, sit5, sit6, tabata)
 
     fun byId(id: String) = all.firstOrNull { it.id == id }
 }

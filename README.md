@@ -33,12 +33,28 @@ Prøv kildene i denne rekkefølgen: Bluetooth, så ANT+, så kamera.
 - **Neste intervall ⏭** og **Hopp over oppvarming** på øktskjermen.
 - **Øktbygger:** «+ Lag ny økt», eller «Lag egen versjon» av en ferdig økt. Endre navn, tid, % av FTP, kadens og ståperiode per intervall, kopier, flytt og slett. Egne økter lagres bare på telefonen.
 
+## Treningsplaner
+
+Under **Økter → Planer** ligger forskningsbaserte planer. Hver plan viser hva studien fant, forbehold og kilder, og alle planene starter og slutter med FTP-test. Trykk «Start planen», så viser Tren-fanen neste økt i planen og teller fram når du har kjørt den. Øktene finnes også som vanlige økter i lista.
+
+| Plan | Bygger på | Lengde |
+|---|---|---|
+| NTNU 4×4 | Helgerud m.fl. 2007 (NTNU/CERG) | 8 uker, 3/uke |
+| NTNU 1×4 – lite tid | Tjønna m.fl. 2013 (NTNU/CERG) | 10 uker, 3/uke |
+| Rønnestad 30/15 | Rønnestad m.fl. 2020 | 4 uker, 3/uke |
+| Seiler 4×8 | Seiler m.fl. 2013 | 7 uker, 4/uke |
+| Polarisert 80/20 | Stöggl & Sperlich 2014 | 9 uker, 3–4/uke |
+| Sprint 2 uker | Gibala-laben (Gist m.fl. 2014) | 2 uker + test |
+| Tabata 6 uker | Tabata m.fl. 1996 | 6 uker, 3/uke |
+
+Prosentene av FTP er omregnet fra pulsmålene i studiene. Alle øktene har kadensmål og skifter kadens og watt underveis.
+
 ## Figuren ved måleren
 
 - Figurene er fra **Pixel Adventure 1** av Pixel Frog (CC0, se `app/src/main/assets/mascot/LISENS.txt`), pluss en rev fra et eget spriteark. Velg Frosk, Maske, Rosa, Virtuell eller Rev under Profil → Figuren.
 - Figuren løper fritt i en boks fra venstre til høyre kant og fra under buen til over buen. Gulvet er under buen. Hopper den mot buen, spretter den av og snur, som mot veggene.
 - **Står** ved pause eller lav kadens, **løper** fram og tilbake (farten følger kadensen), **løper fort og hopper** (av og til dobbelthopp) ved høy kadens, og **klatrer** opp veggen ved mye kraft og lav kadens, og hopper ut over kanten på toppen.
-- Tersklene og reaksjonstiden justeres under Profil → Figuren. Økta «Figur-test» går gjennom alle tilstandene.
+- Tersklene og reaksjonstiden justeres under Profil → Figuren.
 - Ekorn-verktøyene (`tools/sprite-studio/`, `tools/import_squirrel_sprites.py`) ligger igjen, men brukes ikke av appen nå.
 
 ## Personvern og lagring

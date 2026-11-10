@@ -125,9 +125,7 @@ fun PowerGauge(
                     fontWeight = FontWeight.SemiBold, fontFamily = Inter, lineHeight = fs(34f))
                 Text(" rpm", color = C.n400, fontSize = fs(13f), fontFamily = Inter, modifier = Modifier.padding(bottom = (5 * k).dp))
             }
-            if (cadenceLow != null && cadenceHigh != null) {
-                Text("mål $cadenceLow–$cadenceHigh", color = C.n400, fontSize = fs(12f), fontFamily = Inter)
-            }
+            // Kadensmålet vises under wattmålet over måleren; i buen står bare det du tråkker
         }
 
         // Figuren løper fritt i en boks: venstre til høyre kant, fra under buen til over buen.

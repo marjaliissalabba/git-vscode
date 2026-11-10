@@ -110,6 +110,7 @@ fun RideScreen(activity: MainActivity, workout: Workout, onFinished: (RideSummar
     }
     fun saveRide(summary: RideSummary) {
         no.spinapp.HistoryStore.add(no.spinapp.core.RideRecord.from(summary, workout.id, ftp, startedAt))
+        AppState.onRideSaved(workout.id)
     }
     val sourceStatus by (source?.status ?: kotlinx.coroutines.flow.MutableStateFlow("Ingen datakilde")).collectAsState()
 
@@ -260,13 +261,15 @@ fun RideScreen(activity: MainActivity, workout: Workout, onFinished: (RideSummar
             }
         }
 
-        // 3. Tittelrad
+        // 3. Tittelrad: intervallets navn, eller «STÅ OPP» / «SITT NED» når det gjelder
         Row(verticalAlignment = Alignment.Bottom) {
             Column(Modifier.weight(1f)) {
-                Text("${workout.name} · ${(state.segmentIndex + 1).coerceAtMost(workout.segments.size)} av ${workout.segments.size}",
+                Text("Intervall ${(state.segmentIndex + 1).coerceAtMost(workout.segments.size)} av ${workout.segments.size}",
                     color = C.n400, fontSize = 14.sp, fontFamily = Inter, maxLines = 1)
-                Text(seg?.name ?: "Ferdig", color = zoneColor, fontSize = 30.sp, fontFamily = Inter, fontWeight = FontWeight.Medium,
-                    maxLines = 1, lineHeight = 34.sp)
+                if (!StandTitle(state.stand, showSit = state.elapsedSec < sitBannerUntil)) {
+                    Text(seg?.name ?: "Ferdig", color = zoneColor, fontSize = 30.sp, fontFamily = Inter, fontWeight = FontWeight.Medium,
+                        maxLines = 1, lineHeight = 34.sp)
+                }
             }
             Column(horizontalAlignment = Alignment.End) {
                 Text("Igjen av økta", color = C.n400, fontSize = 14.sp, fontFamily = Inter)
@@ -313,11 +316,13 @@ fun RideScreen(activity: MainActivity, workout: Workout, onFinished: (RideSummar
             Column(Modifier.weight(1f)) {
                 Text(if (seg != null) "Mål ${seg.powerLowPct}–${seg.powerHighPct} %" else "–", color = C.n100, fontSize = 24.sp, fontFamily = Inter, fontWeight = FontWeight.Medium)
                 if (seg != null) Text("${state.targetPowerLow}–${state.targetPowerHigh} W", color = C.n400, fontSize = 14.sp, fontFamily = Inter)
+                if (seg != null) {
+                    Text("Mål ${seg.cadenceLow}–${seg.cadenceHigh} rpm", color = C.n100, fontSize = 24.sp, fontFamily = Inter,
+                        fontWeight = FontWeight.Medium, modifier = Modifier.padding(top = 4.dp))
+                }
             }
             StatusPill(state)
         }
-
-        StandBanner(state.stand, showSit = state.elapsedSec < sitBannerUntil)
 
         // 6. Måleren. Målingene kommer ca. én gang i sekundet; tallene, pila og figurens fart
         // glides mellom dem så det ikke hakker.
@@ -335,7 +340,6 @@ fun RideScreen(activity: MainActivity, workout: Workout, onFinished: (RideSummar
             cadenceHigh = seg?.cadenceHigh,
             cadenceStatus = state.cadenceStatus,
             paused = paused,
-            showSquirrelLabel = workout.id == "ekorntest",
             showSquirrel = remember { AppState.squirrelEnabled },
             modifier = Modifier.fillMaxWidth().weight(1f),
         )
@@ -511,20 +515,22 @@ private class Coach(context: Context) {
 
 /** Stort banner: «Stå opp om …», «STÅ OPP» med nedtelling, eller «Sitt ned». */
 @Composable
-private fun StandBanner(cue: no.spinapp.core.StandCue, showSit: Boolean) {
+/**
+ * «STÅ OPP» / «Gjør deg klar» / «SITT NED» der intervallnavnet står, så måleren beholder plassen.
+ * Returnerer false når det ikke er noe å vise (da vises intervallnavnet).
+ */
+@Composable
+private fun StandTitle(cue: no.spinapp.core.StandCue, showSit: Boolean): Boolean {
     val (text, color) = when {
         cue.standing -> "⬆ STÅ OPP · ${formatTime(cue.standLeftSec ?: 0)}" to Color(0xFF8E44AD)
-        cue.standInSec != null -> "Gjør deg klar: stå opp om ${cue.standInSec} s" to Color(0xFF5B2C6F)
+        cue.standInSec != null -> "Stå opp om ${cue.standInSec} s" to Color(0xFF5B2C6F)
         showSit -> "⬇ SITT NED" to Color(0xFF2E86DE)
-        else -> return
+        else -> return false
     }
     Box(
-        Modifier
-            .fillMaxWidth()
-            .background(color, RoundedCornerShape(14.dp))
-            .padding(vertical = 10.dp),
-        contentAlignment = Alignment.Center,
+        Modifier.padding(top = 2.dp).background(color, RoundedCornerShape(10.dp)).padding(horizontal = 12.dp, vertical = 2.dp),
     ) {
-        Text(text, fontSize = 26.sp, fontWeight = FontWeight.Bold, color = Color.White)
+        Text(text, fontSize = 26.sp, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 1, lineHeight = 32.sp)
     }
+    return true
 }

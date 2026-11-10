@@ -82,9 +82,10 @@ private fun dayLong(d: LocalDate) = d.dayOfWeek.getDisplayName(JTextStyle.FULL, 
 
 fun categoryOf(w: Workout): String = when {
     CustomWorkoutStore.isCustom(w.id) -> "Mine"
-    w.id in setOf("grunn45", "restitusjon") -> "Utholdenhet"
-    w.id in setOf("terskel3x8", "pyramide") -> "Terskel"
-    w.id == "ftptest" || w.id == "ekorntest" -> "Test"
+    w.id in setOf("grunn45", "restitusjon", "sone2") -> "Utholdenhet"
+    w.id in setOf("terskel3x8", "pyramide", "seiler4x8", "ronnestad3015") -> "Terskel"
+    w.id in setOf("sit4", "sit5", "sit6", "tabata") -> "Sprint"
+    w.id == "ftptest" -> "Test"
     else -> "VO2maks"
 }
 
@@ -106,6 +107,8 @@ fun MainShell(
 ) {
     var sheetWorkout by remember { mutableStateOf<Workout?>(null) }
     var sheetRide by remember { mutableStateOf<RideRecord?>(null) }
+    var sheetPlan by remember { mutableStateOf<no.spinapp.core.TrainingPlan?>(null) }
+    var planVersion by remember { mutableIntStateOf(0) } // tegner Tren på nytt når planen endres
     var ftp by remember { mutableIntStateOf(AppState.ftp) }
 
     Column(Modifier.fillMaxSize().background(C.bg).statusBarsPadding()) {
@@ -115,8 +118,11 @@ fun MainShell(
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 when (tab) {
-                    Tab.Tren -> TrenTab(ftp, onOpen = { sheetWorkout = it }, onProfil = { onTab(Tab.Profil) })
-                    Tab.Okter -> OkterTab(onOpen = { sheetWorkout = it }, onBuild = { onBuild(null) })
+                    Tab.Tren -> key(planVersion) {
+                        TrenTab(ftp, onOpen = { sheetWorkout = it }, onProfil = { onTab(Tab.Profil) },
+                            onPlan = { sheetPlan = it }, onPlanChanged = { planVersion++ }, onPlans = { onTab(Tab.Okter) })
+                    }
+                    Tab.Okter -> OkterTab(onOpen = { sheetWorkout = it }, onBuild = { onBuild(null) }, onPlan = { sheetPlan = it })
                     Tab.Logg -> LoggTab(ftp, onOpen = { sheetRide = it })
                     Tab.Profil -> ProfilTab(activity, ftp, onFtp = { AppState.ftp = it; ftp = AppState.ftp },
                         onFtpTest = { sheetWorkout = WorkoutLibrary.ftpTest }, onBleSetup = onBleSetup, onCameraSetup = onCameraSetup)
@@ -139,6 +145,20 @@ fun MainShell(
             WorkoutSheet(w, ftp,
                 onStart = { sheetWorkout = null; onStart(it) },
                 onEdit = { sheetWorkout = null; onBuild(w) })
+        }
+    }
+    sheetPlan?.let { plan ->
+        ModalBottomSheet(
+            onDismissRequest = { sheetPlan = null },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = C.surface,
+            scrimColor = C.scrim,
+            shape = RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp),
+            dragHandle = { SheetHandle() },
+        ) {
+            PlanSheet(plan,
+                onOpenWorkout = { sheetPlan = null; sheetWorkout = it },
+                onChanged = { planVersion++; sheetPlan = null; onTab(Tab.Tren) })
         }
     }
     sheetRide?.let { r ->
@@ -183,16 +203,30 @@ private fun BottomNav(tab: Tab, onTab: (Tab) -> Unit) {
 // ---------------- Tren ----------------
 
 @Composable
-private fun TrenTab(ftp: Int, onOpen: (Workout) -> Unit, onProfil: () -> Unit) {
+private fun TrenTab(
+    ftp: Int, onOpen: (Workout) -> Unit, onProfil: () -> Unit,
+    onPlan: (no.spinapp.core.TrainingPlan) -> Unit, onPlanChanged: () -> Unit, onPlans: () -> Unit,
+) {
     val records by HistoryStore.records.collectAsState()
     var perWeek by remember { mutableIntStateOf(AppState.sessionsPerWeek) }
     val today = LocalDate.now()
     val week = AppState.weekNumber
-    val plan = WeeklyPlanner.plan(perWeek, week)
     val stats = HistoryStats.week(records, today)
     val thisWeek = records.filter { val d = it.localDate(); !d.isBefore(today.with(java.time.DayOfWeek.MONDAY)) }
         .sortedBy { it.startedAtEpochSec }
-    val done = thisWeek.size.coerceAtMost(plan.size)
+    // Aktiv treningsplan, eller den enkle ukeplanen
+    val active = no.spinapp.core.TrainingPlans.byId(AppState.activePlanId)
+    val step = AppState.planStep
+    val loc = active?.locate(step)
+    val plan: List<Workout>
+    val done: Int
+    if (active != null && loc != null) {
+        plan = active.weeks[loc.first].mapNotNull { WorkoutLibrary.byId(it) }
+        done = loc.second
+    } else {
+        plan = WeeklyPlanner.plan(perWeek, week)
+        done = thisWeek.size.coerceAtMost(plan.size)
+    }
     val next = plan.getOrNull(done) ?: plan.first()
 
     // Topp
@@ -216,9 +250,55 @@ private fun TrenTab(ftp: Int, onOpen: (Workout) -> Unit, onProfil: () -> Unit) {
         }
     }
 
+    // Treningsplan
+    if (active != null) {
+        SpinCard(onClick = { onPlan(active) }) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Muted("Treningsplan", 13, C.accent300)
+                    Text(active.name, color = C.n100, fontSize = 18.sp, fontFamily = Inter, fontWeight = FontWeight.Medium)
+                    Muted(
+                        if (loc == null) "Fullført! Se ny FTP under Profil, eller velg en ny plan."
+                        else "Uke ${loc.first + 1} av ${active.weekCount} · økt ${step + 1} av ${active.sessions.size}",
+                        13, C.n300,
+                    )
+                }
+                Icon(Ico.CaretRight, C.n400, 16.dp)
+            }
+            Spacer(Modifier.height(8.dp))
+            Box(Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)).background(C.n800)) {
+                Box(Modifier.fillMaxWidth((step.toFloat() / active.sessions.size).coerceIn(0f, 1f)).height(4.dp).background(C.accent))
+            }
+            if (loc != null) {
+                Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    LinkText("Hopp over denne økta") { AppState.planStep = step + 1; onPlanChanged() }
+                    if (step > 0) LinkText("Tilbake én") { AppState.planStep = step - 1; onPlanChanged() }
+                }
+            } else {
+                LinkText("Avslutt planen") { AppState.activePlanId = null; onPlanChanged() }
+            }
+        }
+    } else {
+        SpinCard(onClick = onPlans) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Velg en treningsplan", color = C.n100, fontSize = 16.sp, fontFamily = Inter, fontWeight = FontWeight.Medium)
+                    Muted("NTNU 4×4, Rønnestad 30/15, polarisert og flere, med det forskningen fant.", 13, C.n300)
+                }
+                Icon(Ico.CaretRight, C.n400, 16.dp)
+            }
+        }
+    }
+
     // Neste økt
     Column {
-        Muted(if (done >= plan.size) "Ukas plan er fullført · ekstra økt" else "Neste økt · ${done + 1} av ${plan.size} denne uka", 14, C.n300)
+        Muted(
+            when {
+                active != null && loc != null -> "Neste økt i planen · ${done + 1} av ${plan.size} denne uka"
+                done >= plan.size -> "Ukas plan er fullført · ekstra økt"
+                else -> "Neste økt · ${done + 1} av ${plan.size} denne uka"
+            }, 14, C.n300,
+        )
         Text(next.name, color = C.n100, fontSize = 34.sp, fontFamily = Inter, fontWeight = FontWeight.Medium, lineHeight = 40.sp)
         Muted("${next.durationSec / 60} min · TSS ca. ${next.estimatedTss()} · ${next.description}", 15, C.n300)
     }
@@ -241,10 +321,12 @@ private fun TrenTab(ftp: Int, onOpen: (Workout) -> Unit, onProfil: () -> Unit) {
 
     // Ukeplan
     Row(verticalAlignment = Alignment.CenterVertically) {
-        SectionTitle("Ukeplan", Modifier.weight(1f))
-        StepButton(false, { AppState.sessionsPerWeek = perWeek - 1; perWeek = AppState.sessionsPerWeek }, enabled = perWeek > 1)
-        Muted("  $perWeek økter/uke  ", 14, C.n300)
-        StepButton(true, { AppState.sessionsPerWeek = perWeek + 1; perWeek = AppState.sessionsPerWeek }, enabled = perWeek < 6)
+        SectionTitle(if (active != null && loc != null) "Denne uka i planen" else "Ukeplan", Modifier.weight(1f))
+        if (active == null || loc == null) {
+            StepButton(false, { AppState.sessionsPerWeek = perWeek - 1; perWeek = AppState.sessionsPerWeek }, enabled = perWeek > 1)
+            Muted("  $perWeek økter/uke  ", 14, C.n300)
+            StepButton(true, { AppState.sessionsPerWeek = perWeek + 1; perWeek = AppState.sessionsPerWeek }, enabled = perWeek < 6)
+        }
     }
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
         plan.forEachIndexed { i, w ->
@@ -266,7 +348,11 @@ private fun TrenTab(ftp: Int, onOpen: (Workout) -> Unit, onProfil: () -> Unit) {
                 Column(Modifier.weight(1f).padding(start = 14.dp)) {
                     Text(w.name, color = if (isDone) C.n400 else C.n100, fontSize = 16.sp, fontFamily = Inter)
                     Muted(
-                        if (isDone) "Fullført ${dayLong(thisWeek[i].localDate())}" else "${w.durationSec / 60} min · TSS ${w.estimatedTss()}",
+                        when {
+                            isDone && active != null && loc != null -> "Fullført"
+                            isDone -> thisWeek.getOrNull(i)?.let { "Fullført ${dayLong(it.localDate())}" } ?: "Fullført"
+                            else -> "${w.durationSec / 60} min · TSS ${w.estimatedTss()}"
+                        },
                         13,
                     )
                 }
@@ -284,7 +370,7 @@ private fun TrenTab(ftp: Int, onOpen: (Workout) -> Unit, onProfil: () -> Unit) {
 // ---------------- Økter ----------------
 
 @Composable
-private fun OkterTab(onOpen: (Workout) -> Unit, onBuild: () -> Unit) {
+private fun OkterTab(onOpen: (Workout) -> Unit, onBuild: () -> Unit, onPlan: (no.spinapp.core.TrainingPlan) -> Unit) {
     val custom by CustomWorkoutStore.workouts.collectAsState()
     var filter by rememberSaveable { mutableStateOf("Alle") }
     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -292,7 +378,24 @@ private fun OkterTab(onOpen: (Workout) -> Unit, onBuild: () -> Unit) {
         AccentButton("Lag egen", onBuild, icon = { Icon(Ico.Plus, C.accent200, 14.dp) })
     }
     Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        listOf("Alle", "Utholdenhet", "Terskel", "VO2maks", "Test", "Mine").forEach { c -> Pill(c, filter == c) { filter = c } }
+        listOf("Alle", "Planer", "Utholdenhet", "Terskel", "VO2maks", "Sprint", "Test", "Mine").forEach { c -> Pill(c, filter == c) { filter = c } }
+    }
+    if (filter == "Alle" || filter == "Planer") {
+        SectionTitle("Treningsplaner")
+        val activeId = AppState.activePlanId
+        no.spinapp.core.TrainingPlans.all.forEach { p ->
+            SpinCard(onClick = { onPlan(p) }) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(p.name, Modifier.weight(1f), color = C.n100, fontSize = 18.sp, fontFamily = Inter, fontWeight = FontWeight.Medium)
+                    if (p.id == activeId) Muted("Aktiv", 13, C.accent300) else Muted("${p.weekCount} uker · ${p.perWeek}/uke", 13)
+                }
+                Muted(p.origin, 12, C.accent300)
+                Spacer(Modifier.height(4.dp))
+                Muted(p.summary, 14, C.n300)
+            }
+        }
+        if (filter == "Planer") return
+        SectionTitle("Økter")
     }
     val list = (WorkoutLibrary.all + custom).filter { filter == "Alle" || categoryOf(it) == filter }
     if (list.isEmpty()) {
@@ -311,13 +414,75 @@ private fun OkterTab(onOpen: (Workout) -> Unit, onBuild: () -> Unit) {
     }
 }
 
+/** Ark for en treningsplan: hva den er, hva forskningen fant, forbehold, kilder, uker og start. */
+@Composable
+private fun PlanSheet(plan: no.spinapp.core.TrainingPlan, onOpenWorkout: (Workout) -> Unit, onChanged: () -> Unit) {
+    val uri = androidx.compose.ui.platform.LocalUriHandler.current
+    val isActive = AppState.activePlanId == plan.id
+    Column(
+        Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 18.dp).padding(bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Muted(plan.origin, 13, C.accent300)
+        Text(plan.name, color = C.n100, fontSize = 28.sp, fontFamily = Inter, fontWeight = FontWeight.Medium)
+        Muted("${plan.weekCount} uker · ${plan.sessions.size} økter · ca. ${plan.perWeek} i uka", 14, C.n300)
+        Muted(plan.summary, 15, C.n200)
+
+        SpinCard {
+            Muted("Hva forskningen fant", 13, C.accent300)
+            Spacer(Modifier.height(4.dp))
+            Muted(plan.research, 14, C.n200)
+            Spacer(Modifier.height(10.dp))
+            Muted("Forbehold", 13, C.warn)
+            Spacer(Modifier.height(4.dp))
+            Muted(plan.caveats, 14, C.n300)
+            Spacer(Modifier.height(10.dp))
+            Muted("Kilder", 13, C.n400)
+            plan.sources.forEach { src -> LinkText("↗ ${src.label}") { runCatching { uri.openUri(src.url) } } }
+        }
+
+        SectionTitle("Uke for uke")
+        val step = if (isActive) AppState.planStep else -1
+        var idx = 0
+        plan.weeks.forEachIndexed { w, list ->
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Muted("Uke ${w + 1}", 13, C.n400)
+                list.forEach { id ->
+                    val i = idx++
+                    val wo = WorkoutLibrary.byId(id) ?: return@forEach
+                    Row(
+                        Modifier.fillMaxWidth().alpha(if (i < step) 0.45f else 1f).clip(RoundedCornerShape(8.dp))
+                            .clickable { onOpenWorkout(wo) }.padding(vertical = 6.dp, horizontal = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Box(Modifier.size(20.dp), contentAlignment = Alignment.Center) {
+                            if (i < step) Icon(Ico.Check, C.n400, 14.dp)
+                            if (i == step) Icon(Ico.Play, C.accent200, 12.dp)
+                        }
+                        Text(wo.name, Modifier.weight(1f).padding(start = 8.dp), color = C.n100, fontSize = 15.sp, fontFamily = Inter)
+                        Muted("${wo.durationSec / 60} min", 13)
+                        Spacer(Modifier.width(8.dp))
+                        ProfileBars(wo, Modifier.width(70.dp).height(18.dp))
+                    }
+                }
+            }
+        }
+        Muted("Oppvarming legges på før hver økt, som ellers i appen. Alle øktene finnes også i øktlista.", 13, C.n400)
+        if (isActive) {
+            AccentButton("Avslutt planen", { AppState.activePlanId = null; onChanged() }, Modifier.fillMaxWidth())
+        } else {
+            AccentButton("Start planen", { AppState.activePlanId = plan.id; onChanged() }, Modifier.fillMaxWidth(), big = true,
+                icon = { Icon(Ico.Play, C.n100, 18.dp) })
+        }
+    }
+}
+
 /** Ark for en økt: detaljer, tid i soner, oppvarming, lengde og start. */
 @Composable
 private fun WorkoutSheet(w: Workout, ftp: Int, onStart: (Workout) -> Unit, onEdit: () -> Unit) {
     val original = remember(w) { WorkoutComposer.mainMinutes(w) }
     val options = remember(w) { WorkoutComposer.lengthOptions(w) }
-    // Figur-testen skal vise tilstandene med en gang, så den starter uten oppvarming
-    var warmup by remember { mutableIntStateOf(if (w.id == "ekorntest") 0 else AppState.warmupMinutes) }
+    var warmup by remember { mutableIntStateOf(AppState.warmupMinutes) }
     var length by remember(w) { mutableIntStateOf(original) }
     val composed = remember(w, warmup, length) { WorkoutComposer.compose(w, warmup, if (length == original) null else length) }
     val main = remember(w, length) { if (length == original) w else WorkoutComposer.scale(w, length) }
@@ -363,7 +528,7 @@ private fun WorkoutSheet(w: Workout, ftp: Int, onStart: (Workout) -> Unit, onEdi
             }
             StepButton(true, { options.firstOrNull { it > length }?.let { length = it } }, 40.dp, enabled = options.any { it > length })
         }
-        AccentButton("Start økta", { if (w.id != "ekorntest") AppState.warmupMinutes = warmup; onStart(composed) }, Modifier.fillMaxWidth(), big = true,
+        AccentButton("Start økta", { AppState.warmupMinutes = warmup; onStart(composed) }, Modifier.fillMaxWidth(), big = true,
             icon = { Icon(Ico.Play, C.n100, 18.dp) })
         Text(
             if (CustomWorkoutStore.isCustom(w.id)) "Endre økta" else "Lag egen versjon",

@@ -55,6 +55,22 @@ object AppState {
         get() = prefs.getInt("sessionsPerWeek", 3)
         set(v) = prefs.edit().putInt("sessionsPerWeek", v.coerceIn(1, 6)).apply()
 
+    /** Treningsplanen som følges (id i TrainingPlans), eller null. */
+    var activePlanId: String?
+        get() = prefs.getString("activePlan", null)
+        set(v) = prefs.edit().putString("activePlan", v).putInt("planStep", 0).apply()
+
+    /** Hvor langt man har kommet i planen (indeks i plan.sessions). */
+    var planStep: Int
+        get() = prefs.getInt("planStep", 0)
+        set(v) = prefs.edit().putInt("planStep", v.coerceAtLeast(0)).apply()
+
+    /** Teller planen fram når neste planlagte økt er gjennomført. */
+    fun onRideSaved(workoutId: String) {
+        val plan = no.spinapp.core.TrainingPlans.byId(activePlanId) ?: return
+        if (plan.sessions.getOrNull(planStep) == workoutId) planStep += 1
+    }
+
     val weekNumber: Int
         get() {
             val start = prefs.getLong("planStart", LocalDate.now().toEpochDay())

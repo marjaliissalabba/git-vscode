@@ -211,3 +211,44 @@ class WorkoutTest {
         assertTrue(sum.normalizedPower >= sum.avgPower)
     }
 }
+
+class TrainingPlansTest {
+    @Test
+    fun everyPlanSessionExistsAsWorkout() {
+        for (p in TrainingPlans.all) for (id in p.sessions) {
+            kotlin.test.assertNotNull(WorkoutLibrary.byId(id), "${p.name}: $id")
+        }
+    }
+
+    @Test
+    fun plansStartAndEndWithFtpTest() {
+        for (p in TrainingPlans.all) {
+            assertEquals("ftptest", p.sessions.first(), p.name)
+            assertEquals("ftptest", p.sessions.last(), p.name)
+            kotlin.test.assertTrue(p.sources.isNotEmpty() && p.research.isNotBlank())
+        }
+    }
+
+    @Test
+    fun locateStep() {
+        val p = TrainingPlans.ntnu4x4
+        assertEquals(0 to 0, p.locate(0))
+        assertEquals(1 to 0, p.locate(3))
+        assertEquals(null, p.locate(p.sessions.size))
+        assertEquals(8, p.weekCount)
+        assertEquals(3, p.perWeek)
+    }
+
+    @Test
+    fun researchWorkoutsHaveCadenceAndVariation() {
+        val ids = listOf("ntnu4x4", "ntnu1x4", "ronnestad3015", "seiler4x8", "sone2", "sit4", "sit6", "tabata")
+        for (id in ids) {
+            val w = WorkoutLibrary.byId(id)!!
+            kotlin.test.assertTrue(w.segments.all { it.cadenceHigh > it.cadenceLow }, id)
+            kotlin.test.assertTrue(w.segments.map { it.midCadence }.toSet().size >= 3, "kadensen varierer: $id")
+            kotlin.test.assertTrue(w.segments.map { it.midPct }.toSet().size >= 3, "wattmålet varierer: $id")
+        }
+        // 30/15: 3 × 13 drag på 30 s
+        assertEquals(39, WorkoutLibrary.ronnestad3015.segments.count { it.durationSec == 30 && it.powerLowPct >= 118 })
+    }
+}
