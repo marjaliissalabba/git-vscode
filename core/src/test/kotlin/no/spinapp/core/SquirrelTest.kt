@@ -38,44 +38,55 @@ class SquirrelTest {
     @Test
     fun transitionsPlayOnceThenLoop() {
         val p = SquirrelPlayer()
-        p.advance(10.0, SquirrelMode.RUN, 80)
-        assertEquals(SquirrelClip.RUN, p.clip)
-        // Inn i klatring: run_to_climb én gang
-        p.advance(1.0, SquirrelMode.CLIMB, 60)
-        assertEquals(SquirrelClip.RUN_TO_CLIMB, p.clip)
-        p.advance(120.0 * 6, SquirrelMode.CLIMB, 60)
+        val tr = 1000.0 / 14
+        p.advance(10.0, SquirrelMode.IDLE, 0)
+        assertEquals(SquirrelClip.IDLE, p.clip)
+        p.advance(1.0, SquirrelMode.RUN, 85)
+        assertEquals(SquirrelClip.IDLE_TO_SLOW_RUN, p.clip)
+        p.advance(tr * 6, SquirrelMode.RUN, 85)
+        assertEquals(SquirrelClip.SLOW_RUN, p.clip)
+        p.advance(1.0, SquirrelMode.CLIMB, 65)
+        assertEquals(SquirrelClip.SLOW_RUN_TO_CLIMB, p.clip)
+        p.advance(tr * 6, SquirrelMode.CLIMB, 65)
         assertEquals(SquirrelClip.CLIMB, p.clip)
-        // Klatring looper
-        p.advance(130.0 * 12, SquirrelMode.CLIMB, 60)
-        assertEquals(SquirrelClip.CLIMB, p.clip)
-        // Ut av klatring: over toppen én gang, så løping
-        p.advance(1.0, SquirrelMode.RUN, 80)
-        assertEquals(SquirrelClip.CLIMB_TO_RUN, p.clip)
-        p.advance(120.0 * 6, SquirrelMode.RUN, 80)
-        assertEquals(SquirrelClip.RUN, p.clip)
+        p.advance(2000.0, SquirrelMode.CLIMB, 65)
+        assertEquals(SquirrelClip.CLIMB, p.clip) // løkke
+        p.advance(1.0, SquirrelMode.SPRINT, 110)
+        assertEquals(SquirrelClip.CLIMB_TO_FAST_RUN, p.clip)
+        p.advance(tr * 6, SquirrelMode.SPRINT, 110)
+        assertEquals(SquirrelClip.FAST_RUN, p.clip)
+    }
+
+    @Test
+    fun everyPairHasATransition() {
+        for (a in SquirrelMode.entries) for (b in SquirrelMode.entries) if (a != b) {
+            kotlin.test.assertNotNull(SquirrelClip.transition(a, b), "$a → $b")
+        }
     }
 
     @Test
     fun transitionIsNotInterrupted() {
         val p = SquirrelPlayer()
-        p.advance(1.0, SquirrelMode.RUN, 80)
-        p.advance(1.0, SquirrelMode.CLIMB, 60)
-        assertEquals(SquirrelClip.RUN_TO_CLIMB, p.clip)
-        // Målet endres midt i overgangen: overgangen spilles ferdig, så over toppen
-        p.advance(200.0, SquirrelMode.RUN, 80)
-        assertEquals(SquirrelClip.RUN_TO_CLIMB, p.clip)
-        p.advance(120.0 * 5, SquirrelMode.RUN, 80)
-        assertEquals(SquirrelClip.CLIMB_TO_RUN, p.clip)
+        p.advance(1.0, SquirrelMode.RUN, 85)          // idle → slow_run
+        p.advance(1000.0, SquirrelMode.RUN, 85)
+        assertEquals(SquirrelClip.SLOW_RUN, p.clip)
+        p.advance(1.0, SquirrelMode.CLIMB, 65)
+        assertEquals(SquirrelClip.SLOW_RUN_TO_CLIMB, p.clip)
+        // Målet endres midt i overgangen: den spilles ferdig, så klatring → rolig løp
+        p.advance(150.0, SquirrelMode.RUN, 85)
+        assertEquals(SquirrelClip.SLOW_RUN_TO_CLIMB, p.clip)
+        p.advance(1000.0 / 14 * 5, SquirrelMode.RUN, 85)
+        assertEquals(SquirrelClip.CLIMB_TO_SLOW_RUN, p.clip)
     }
 
     @Test
     fun speedFollowsCadence() {
         val p = SquirrelPlayer()
-        assertEquals(1000.0 / 6, p.frameDurationMs(SquirrelClip.RUN, 60), 0.01)
-        assertEquals(60000.0 / (116 * 6), p.frameDurationMs(SquirrelClip.SPRINT, 116), 0.01) // ca. 86 ms
-        assertEquals(1000.0 / 6, p.frameDurationMs(SquirrelClip.CLIMB, 60), 0.01)
-        kotlin.test.assertTrue(p.frameDurationMs(SquirrelClip.SPRINT, 116) < p.frameDurationMs(SquirrelClip.RUN, 80))
-        assertEquals(250.0, p.frameDurationMs(SquirrelClip.IDLE, 0))
+        assertEquals(100.0, p.frameDurationMs(SquirrelClip.SLOW_RUN, 85), 0.01)
+        assertEquals(62.5, p.frameDurationMs(SquirrelClip.FAST_RUN, 105), 0.01)
+        kotlin.test.assertTrue(p.frameDurationMs(SquirrelClip.FAST_RUN, 116) < 60.0)
+        assertEquals(100.0, p.frameDurationMs(SquirrelClip.CLIMB, 65), 0.01)
+        assertEquals(1000.0 / 6, p.frameDurationMs(SquirrelClip.IDLE, 0), 0.01)
     }
 
     @Test

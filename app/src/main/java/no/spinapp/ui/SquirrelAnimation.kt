@@ -39,7 +39,13 @@ fun SquirrelAnimation(
     showLabel: Boolean = false,
 ) {
     val context = LocalContext.current
-    val frames = remember { loadSquirrelFrames(context) }
+    // Bildene (128 stk.) lastes i bakgrunnen og huskes for resten av appens levetid
+    val frames by androidx.compose.runtime.produceState(SquirrelFrames.cached ?: emptyMap()) {
+        if (SquirrelFrames.cached == null) {
+            SquirrelFrames.cached = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { loadSquirrelFrames(context) }
+        }
+        value = SquirrelFrames.cached!!
+    }
     val director = remember { SquirrelDirector(AppState.squirrelThresholds) }
     val player = remember { SquirrelPlayer() }
 
@@ -71,11 +77,11 @@ fun SquirrelAnimation(
             Image(
                 bitmap = list[shown.second.coerceIn(0, list.lastIndex)],
                 contentDescription = null,
-                filterQuality = FilterQuality.None, // skarp pikselkunst
+                filterQuality = FilterQuality.High, // tegnet stil: myk skalering
                 modifier = Modifier.size(size),
             )
         } else {
-            androidx.compose.material3.Text("(mangler bilder)", color = C.bad, fontSize = 10.sp)
+            androidx.compose.foundation.layout.Spacer(Modifier.size(size))
         }
         if (showLabel) {
             androidx.compose.material3.Text(
@@ -90,6 +96,8 @@ fun SquirrelAnimation(
         }
     }
 }
+
+private object SquirrelFrames { var cached: Map<SquirrelClip, List<ImageBitmap>>? = null }
 
 private fun loadSquirrelFrames(context: Context): Map<SquirrelClip, List<ImageBitmap>> {
     val am = context.assets

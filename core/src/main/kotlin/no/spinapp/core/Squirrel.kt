@@ -27,14 +27,45 @@ data class SquirrelThresholds(
 
 enum class SquirrelMode { IDLE, RUN, SPRINT, CLIMB }
 
-/** Klipp i spritepakken. Mappenavnet i assets er [folder]. */
-enum class SquirrelClip(val folder: String, val loop: Boolean, val frames: Int = 6) {
-    IDLE("idle", true),
-    RUN("run", true),
-    SPRINT("sprint_bouncy", true),
-    CLIMB("climb_run_vertical", true),
-    RUN_TO_CLIMB("run_to_climb", false),
-    CLIMB_TO_RUN("climb_over_crest_to_run", false),
+/**
+ * Klipp i spritepakken (mappenavn = navnet i animations.json). Løkkene har 8 bilder,
+ * overgangene 6 og finnes for alle par av tilstander.
+ */
+enum class SquirrelClip(
+    val folder: String,
+    val loop: Boolean,
+    val frames: Int,
+    val from: SquirrelMode? = null,
+    val to: SquirrelMode? = null,
+) {
+    IDLE("idle", true, 8),
+    SLOW_RUN("slow_run", true, 8),
+    FAST_RUN("fast_run", true, 8),
+    CLIMB("climb", true, 8),
+    IDLE_TO_SLOW_RUN("idle_to_slow_run", false, 6, SquirrelMode.IDLE, SquirrelMode.RUN),
+    SLOW_RUN_TO_IDLE("slow_run_to_idle", false, 6, SquirrelMode.RUN, SquirrelMode.IDLE),
+    IDLE_TO_FAST_RUN("idle_to_fast_run", false, 6, SquirrelMode.IDLE, SquirrelMode.SPRINT),
+    FAST_RUN_TO_IDLE("fast_run_to_idle", false, 6, SquirrelMode.SPRINT, SquirrelMode.IDLE),
+    SLOW_RUN_TO_FAST_RUN("slow_run_to_fast_run", false, 6, SquirrelMode.RUN, SquirrelMode.SPRINT),
+    FAST_RUN_TO_SLOW_RUN("fast_run_to_slow_run", false, 6, SquirrelMode.SPRINT, SquirrelMode.RUN),
+    IDLE_TO_CLIMB("idle_to_climb", false, 6, SquirrelMode.IDLE, SquirrelMode.CLIMB),
+    CLIMB_TO_IDLE("climb_to_idle", false, 6, SquirrelMode.CLIMB, SquirrelMode.IDLE),
+    SLOW_RUN_TO_CLIMB("slow_run_to_climb", false, 6, SquirrelMode.RUN, SquirrelMode.CLIMB),
+    CLIMB_TO_SLOW_RUN("climb_to_slow_run", false, 6, SquirrelMode.CLIMB, SquirrelMode.RUN),
+    FAST_RUN_TO_CLIMB("fast_run_to_climb", false, 6, SquirrelMode.SPRINT, SquirrelMode.CLIMB),
+    CLIMB_TO_FAST_RUN("climb_to_fast_run", false, 6, SquirrelMode.CLIMB, SquirrelMode.SPRINT);
+
+    companion object {
+        fun loopFor(m: SquirrelMode) = when (m) {
+            SquirrelMode.IDLE -> IDLE
+            SquirrelMode.RUN -> SLOW_RUN
+            SquirrelMode.SPRINT -> FAST_RUN
+            SquirrelMode.CLIMB -> CLIMB
+        }
+
+        fun transition(from: SquirrelMode, to: SquirrelMode): SquirrelClip? =
+            entries.firstOrNull { !it.loop && it.from == from && it.to == to }
+    }
 }
 
 /** Velger tilstand ut fra målingene, med hysterese så ekornet ikke blafrer mellom tilstander. */
@@ -130,8 +161,9 @@ class SquirrelDirector(thresholds: SquirrelThresholds = SquirrelThresholds()) {
 }
 
 /**
- * Spiller av klippene: looper tilstandens klipp, og legger inn overgang én gang
- * når man går inn i eller ut av klatring.
+ * Spiller av klippene: looper tilstandens klipp, og spiller riktig overgang én gang
+ * ved hvert tilstandsbytte. En overgang spilles alltid ferdig; deretter velges neste
+ * overgang fra tilstanden den endte i.
  */
 class SquirrelPlayer {
     var clip = SquirrelClip.IDLE
@@ -142,23 +174,20 @@ class SquirrelPlayer {
     private var elapsedMs = 0.0
 
     /**
-     * Varighet per bilde i ms. Løp, hoppende løp og klatring går én runde per pedalomdreining,
-     * så farten følger kadensen: 60 rpm ≈ 167 ms, 90 rpm ≈ 111 ms, 116 rpm ≈ 86 ms per bilde.
+     * Varighet per bilde i ms. Løkkene følger kadensen ut fra spritepakkens anbefalte fart:
+     * rolig løp 10 bilder/s ved 85 rpm, raskt løp 16 bilder/s ved 105 rpm (≈ 18 ved 116 rpm),
+     * klatring 10 bilder/s ved 65 rpm. Hvile 6 bilder/s, overganger 14 bilder/s.
      */
-    fun frameDurationMs(c: SquirrelClip, rpm: Int?): Double = when (c) {
-        SquirrelClip.IDLE -> 250.0
-        SquirrelClip.RUN, SquirrelClip.SPRINT, SquirrelClip.CLIMB -> {
-            val r = (rpm ?: 60).coerceIn(30, 160)
-            (60000.0 / (r * c.frames)).coerceIn(50.0, 250.0)
+    fun frameDurationMs(c: SquirrelClip, rpm: Int?): Double {
+        val r = (rpm ?: 0).toDouble()
+        val fps = when (c) {
+            SquirrelClip.IDLE -> 6.0
+            SquirrelClip.SLOW_RUN -> (10.0 * r / 85.0).coerceIn(5.0, 16.0)
+            SquirrelClip.FAST_RUN -> (16.0 * r / 105.0).coerceIn(10.0, 24.0)
+            SquirrelClip.CLIMB -> (10.0 * r / 65.0).coerceIn(6.0, 14.0)
+            else -> 14.0
         }
-        SquirrelClip.RUN_TO_CLIMB, SquirrelClip.CLIMB_TO_RUN -> 120.0
-    }
-
-    private fun loopFor(m: SquirrelMode) = when (m) {
-        SquirrelMode.IDLE -> SquirrelClip.IDLE
-        SquirrelMode.RUN -> SquirrelClip.RUN
-        SquirrelMode.SPRINT -> SquirrelClip.SPRINT
-        SquirrelMode.CLIMB -> SquirrelClip.CLIMB
+        return 1000.0 / fps
     }
 
     private fun start(c: SquirrelClip) {
@@ -167,21 +196,14 @@ class SquirrelPlayer {
         elapsedMs = 0.0
     }
 
-    /** Velg neste klipp mot ønsket tilstand (eventuelt via en overgang). */
     private fun goTowards(target: SquirrelMode) {
-        val from = shownMode
-        when {
-            target == SquirrelMode.CLIMB && (from == SquirrelMode.RUN || from == SquirrelMode.SPRINT) -> start(SquirrelClip.RUN_TO_CLIMB)
-            from == SquirrelMode.CLIMB && (target == SquirrelMode.RUN || target == SquirrelMode.SPRINT) -> start(SquirrelClip.CLIMB_TO_RUN)
-            else -> start(loopFor(target))
-        }
+        start(SquirrelClip.transition(shownMode, target) ?: SquirrelClip.loopFor(target))
         shownMode = target
     }
 
     /** Går fram [dtMs] millisekunder. Returnerer klipp og bilde som skal vises. */
     fun advance(dtMs: Double, target: SquirrelMode, rpm: Int?): Pair<SquirrelClip, Int> {
-        val inTransition = !clip.loop
-        if (!inTransition && target != shownMode) goTowards(target)
+        if (clip.loop && target != shownMode) goTowards(target)
 
         elapsedMs += dtMs
         var dur = frameDurationMs(clip, rpm)
@@ -192,13 +214,9 @@ class SquirrelPlayer {
             } else if (clip.loop) {
                 frame = 0
             } else {
-                // Overgangen er ferdig: gå til tilstandens loop, eller videre hvis målet har endret seg
-                val landed = when (clip) {
-                    SquirrelClip.RUN_TO_CLIMB -> SquirrelMode.CLIMB
-                    else -> SquirrelMode.RUN
-                }
+                val landed = clip.to ?: shownMode
                 shownMode = landed
-                if (target != landed) goTowards(target) else start(loopFor(landed))
+                if (target != landed) goTowards(target) else start(SquirrelClip.loopFor(landed))
             }
             dur = frameDurationMs(clip, rpm)
         }
