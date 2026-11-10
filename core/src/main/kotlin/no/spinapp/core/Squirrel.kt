@@ -21,6 +21,8 @@ data class SquirrelThresholds(
     /** Hoppende løp slutter under [sprintExitRpm] rpm og under [sprintExitPct] % av FTP. */
     val sprintExitRpm: Int = 95,
     val sprintExitPct: Int = 115,
+    /** Reaksjonstid i sekunder: målingene jevnes ut og en ny tilstand må holde seg så lenge før ekornet bytter. */
+    val delaySec: Int = 3,
 )
 
 enum class SquirrelMode { IDLE, RUN, SPRINT, CLIMB }
@@ -69,6 +71,58 @@ class SquirrelStateMachine(var thresholds: SquirrelThresholds = SquirrelThreshol
                 climbEnter -> SquirrelMode.CLIMB
                 sprintEnter -> SquirrelMode.SPRINT
                 else -> SquirrelMode.RUN
+            }
+        }
+        return mode
+    }
+}
+
+/**
+ * Gjør ekornet rolig: jevner ut watt og rpm over [SquirrelThresholds.delaySec] sekunder,
+ * krever at en ny tilstand holder seg like lenge før den tas i bruk, og at hver tilstand
+ * vises en stund. Pause gir «står og puster» med en gang.
+ */
+class SquirrelDirector(thresholds: SquirrelThresholds = SquirrelThresholds()) {
+    val machine = SquirrelStateMachine(thresholds)
+    var thresholds: SquirrelThresholds
+        get() = machine.thresholds
+        set(v) { machine.thresholds = v }
+
+    var mode = SquirrelMode.IDLE
+        private set
+    private var emaPct: Double? = null
+    private var emaRpm: Double? = null
+    private var candidate = SquirrelMode.IDLE
+    private var candidateMs = 0.0
+    private var inModeMs = 0.0
+
+    /** Rpm for farten: utjevnet og rundet til nærmeste 5. */
+    val animRpm: Int get() = ((emaRpm ?: 0.0) / 5.0).let { kotlin.math.round(it).toInt() * 5 }
+
+    fun update(dtMs: Double, watts: Int?, rpm: Int?, ftp: Int, paused: Boolean): SquirrelMode {
+        val delayMs = thresholds.delaySec.coerceAtLeast(0) * 1000.0
+        val pct = if (ftp > 0 && watts != null) watts * 100.0 / ftp else 0.0
+        val r = (rpm ?: 0).toDouble()
+        // Eksponentiell utjevning med tidskonstant = reaksjonstiden
+        val a = if (delayMs <= 0) 1.0 else (dtMs / delayMs).coerceIn(0.0, 1.0)
+        emaPct = emaPct?.let { it + (pct - it) * a } ?: pct
+        emaRpm = emaRpm?.let { it + (r - it) * a } ?: r
+        inModeMs += dtMs
+
+        if (paused) {
+            mode = SquirrelMode.IDLE
+            machine.update(0, 0, ftp, paused = true)
+            candidate = mode; candidateMs = 0.0; inModeMs = 0.0
+            return mode
+        }
+        val wanted = machine.update((emaPct!! * ftp / 100.0).toInt(), emaRpm!!.toInt(), ftp, paused = false)
+        if (wanted == mode) {
+            candidate = mode; candidateMs = 0.0
+        } else {
+            if (wanted != candidate) { candidate = wanted; candidateMs = 0.0 }
+            candidateMs += dtMs
+            if (candidateMs >= delayMs && inModeMs >= delayMs) {
+                mode = wanted; inModeMs = 0.0; candidateMs = 0.0
             }
         }
         return mode

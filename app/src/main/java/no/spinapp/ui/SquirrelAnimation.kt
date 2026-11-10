@@ -22,19 +22,20 @@ import androidx.compose.ui.unit.dp
 import no.spinapp.AppState
 import no.spinapp.core.SquirrelClip
 import no.spinapp.core.SquirrelPlayer
-import no.spinapp.core.SquirrelStateMachine
+import no.spinapp.core.SquirrelDirector
 
 /**
  * Ekornet på fast plass ved måleren. Watt/FTP og rpm velger tilstand:
  * står og puster (pause/lav aktivitet), løper (jevnt), løper fort og sprettende
  * (høy rpm og innsats) eller klatrer (høy watt og lav rpm). Overgangene til og fra
- * klatring spilles én gang. Tersklene justeres under Profil → Ekornet.
+ * klatring spilles én gang. Med reaksjonstid (standard 3 s) jevnes målingene ut og ekornet
+ * bytter bare når en ny tilstand holder seg. Tersklene justeres under Profil → Ekornet.
  */
 @Composable
 fun SquirrelAnimation(ftp: Int, watts: Int?, rpm: Int?, paused: Boolean, size: Dp = 64.dp, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val frames = remember { loadSquirrelFrames(context) }
-    val machine = remember { SquirrelStateMachine(AppState.squirrelThresholds) }
+    val director = remember { SquirrelDirector(AppState.squirrelThresholds) }
     val player = remember { SquirrelPlayer() }
 
     val w by rememberUpdatedState(watts)
@@ -48,8 +49,9 @@ fun SquirrelAnimation(ftp: Int, watts: Int?, rpm: Int?, paused: Boolean, size: D
         while (true) {
             withFrameNanos { t ->
                 if (last != 0L) {
-                    val target = machine.update(w, r, f, p)
-                    shown = player.advance((t - last) / 1e6, target, r)
+                    val dt = (t - last) / 1e6
+                    val target = director.update(dt, w, r, f, p)
+                    shown = player.advance(dt, target, director.animRpm)
                 }
                 last = t
             }

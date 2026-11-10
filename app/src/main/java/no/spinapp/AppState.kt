@@ -119,6 +119,7 @@ object AppState {
                 sprintAltRpm = g("sprintAltRpm", d.sprintAltRpm),
                 sprintExitRpm = g("sprintExitRpm", d.sprintExitRpm),
                 sprintExitPct = g("sprintExitPct", d.sprintExitPct),
+                delaySec = g("delaySec", d.delaySec),
             )
         }
         set(t) {
@@ -134,6 +135,7 @@ object AppState {
                 .putInt("sq_sprintAltRpm", t.sprintAltRpm)
                 .putInt("sq_sprintExitRpm", t.sprintExitRpm)
                 .putInt("sq_sprintExitPct", t.sprintExitPct)
+                .putInt("sq_delaySec", t.delaySec)
                 .apply()
         }
 

@@ -77,4 +77,26 @@ class SquirrelTest {
         kotlin.test.assertTrue(p.frameDurationMs(SquirrelClip.SPRINT, 116) < p.frameDurationMs(SquirrelClip.RUN, 80))
         assertEquals(250.0, p.frameDurationMs(SquirrelClip.IDLE, 0))
     }
+
+    @Test
+    fun directorIgnoresShortSpikesAndSwitchesAfterDelay() {
+        val d = SquirrelDirector() // 3 s
+        fun run(sec: Double, w: Int, r: Int, paused: Boolean = false): SquirrelMode {
+            var m = d.mode; var t = 0.0
+            while (t < sec * 1000) { m = d.update(16.0, w, r, ftp, paused); t += 16.0 }
+            return m
+        }
+        assertEquals(SquirrelMode.RUN, run(8.0, 130, 88))
+        // 1 s med høy kadens: ingen bytte
+        assertEquals(SquirrelMode.RUN, run(1.0, 130, 110))
+        assertEquals(SquirrelMode.RUN, run(3.0, 130, 88))
+        // Varig klatring: bytter etter en stund, ikke med en gang
+        assertEquals(SquirrelMode.RUN, run(1.0, 180, 62))
+        assertEquals(SquirrelMode.CLIMB, run(8.0, 180, 62))
+        // Pause: står med en gang
+        assertEquals(SquirrelMode.IDLE, run(0.1, 180, 62, paused = true))
+        // Farten bruker utjevnet rpm rundet til 5
+        run(10.0, 130, 92)
+        assertEquals(90, d.animRpm)
+    }
 }

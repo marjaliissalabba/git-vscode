@@ -824,6 +824,8 @@ private fun SquirrelCard(ftp: Int) {
         }
         if (open) {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Muted("Reaksjonstid: målingene jevnes ut, og ekornet bytter bare når en ny tilstand har holdt seg så lenge", 13, C.accent300)
+                MiniStepper("sekunder", th.delaySec, 1) { save(th.copy(delaySec = it.coerceIn(0, 15))) }
                 Muted("Står og puster: pause, eller kadens under", 13, C.accent300)
                 MiniStepper("rpm", th.idleRpm, 5) { save(th.copy(idleRpm = it.coerceIn(0, 60))) }
                 Muted("Oppover (klatrer): mye kraft per tråkk", 13, C.accent300)
