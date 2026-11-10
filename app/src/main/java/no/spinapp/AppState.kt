@@ -107,8 +107,9 @@ object AppState {
         get() = prefs.getBoolean("squirrelEnabled", true)
         set(v) = prefs.edit().putBoolean("squirrelEnabled", v).apply()
     var squirrelBlend: Boolean
-        get() = prefs.getBoolean("squirrelBlend", true)
-        set(v) = prefs.edit().putBoolean("squirrelBlend", v).apply()
+        // Av som standard: blanding viser to bilder samtidig (doble bilder)
+        get() = prefs.getBoolean("squirrelBlend2", false)
+        set(v) = prefs.edit().putBoolean("squirrelBlend2", v).apply()
 
     /** Terskler for ekornet ved måleren (justeres under Profil → Ekornet). Versjon 2 = nye definisjoner. */
     var squirrelThresholds: no.spinapp.core.SquirrelThresholds

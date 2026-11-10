@@ -2,7 +2,7 @@ package no.spinapp.core
 
 /**
  * Ekornet ved måleren. Målingene (watt/FTP og rpm) velger tilstand, og hver tilstand
- * har sin løkke. Ved bytte tones forrige løkke ut over den nye.
+ * har sin løkke. En løkke spilles alltid ferdig før ekornet bytter til neste.
  * Startverdiene er foreløpige og kan justeres under Profil → Ekornet.
  */
 data class SquirrelThresholds(
@@ -137,8 +137,8 @@ class SquirrelDirector(thresholds: SquirrelThresholds = SquirrelThresholds()) {
 }
 
 /**
- * Spiller av løkkene. Ved tilstandsbytte byttes det rett til den nye løkka, og det forrige
- * bildet tones ut over [fadeMs] millisekunder så byttet ikke blir et hopp.
+ * Spiller av løkkene. Ved tilstandsbytte spilles løkka som vises ferdig (til siste bilde),
+ * og så starter den nye løkka på første bilde. Ingen toning, så det blir aldri doble bilder.
  */
 class SquirrelPlayer(
     /**
@@ -146,7 +146,6 @@ class SquirrelPlayer(
      * direkte; for løp og klatring er de rytme (relative lengder), mens kadensen styrer farten.
      */
     var timings: Map<SquirrelClip, DoubleArray> = emptyMap(),
-    val fadeMs: Double = 250.0,
 ) {
     var clip = SquirrelClip.IDLE
         private set
@@ -155,18 +154,15 @@ class SquirrelPlayer(
     private var elapsedMs = 0.0
     private var curDurMs = 1.0
 
-    /** Bildet som tones ut etter et bytte (klipp, bilde), eller null. */
-    var fadeFrom: Pair<SquirrelClip, Int>? = null
+    /** Løkka som venter på at den viste skal bli ferdig, eller null. */
+    var pending: SquirrelClip? = null
         private set
-    private var fadeElapsed = 0.0
-    /** Hvor synlig det gamle bildet er (1 → 0) under byttet. */
-    val fadeAlpha: Double get() = if (fadeFrom == null) 0.0 else (1.0 - fadeElapsed / fadeMs).coerceIn(0.0, 1.0)
 
     /** Hvor langt (0–1) det viste bildet har kommet mot neste. Brukes til myk blanding. */
     val progress: Double get() = (elapsedMs / curDurMs).coerceIn(0.0, 1.0)
 
-    /** Neste bilde i løkka. */
-    val nextFrame: Int get() = (frame + 1) % clip.frames
+    /** Neste bilde i samme løkke, eller null når løkka er ferdig og en annen tar over. */
+    val nextFrame: Int? get() = if (frame == clip.frames - 1 && pending != null) null else (frame + 1) % clip.frames
 
     /**
      * Varighet per bilde i ms. Løkkene følger kadensen ut fra spritepakkens anbefalte fart:
@@ -198,18 +194,18 @@ class SquirrelPlayer(
     /** Går fram [dtMs] millisekunder. Returnerer klipp og bilde som skal vises. */
     fun advance(dtMs: Double, target: SquirrelMode, rpm: Int?): Pair<SquirrelClip, Int> {
         val want = SquirrelClip.loopFor(target)
-        if (want != clip) {
-            fadeFrom = clip to frame; fadeElapsed = 0.0
-            clip = want; frame = 0; elapsedMs = 0.0
-        } else if (fadeFrom != null) {
-            fadeElapsed += dtMs
-            if (fadeElapsed >= fadeMs) fadeFrom = null
-        }
+        pending = if (want != clip) want else null
         elapsedMs += dtMs
         var dur = frameDurationMs(clip, rpm, frame)
         while (elapsedMs >= dur) {
             elapsedMs -= dur
-            frame = (frame + 1) % clip.frames
+            if (frame < clip.frames - 1) {
+                frame++
+            } else {
+                // Løkka er ferdig: bytt nå hvis en annen tilstand venter
+                pending?.let { clip = it; pending = null }
+                frame = 0
+            }
             dur = frameDurationMs(clip, rpm, frame)
         }
         curDurMs = dur

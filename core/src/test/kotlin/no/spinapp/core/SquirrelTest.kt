@@ -88,22 +88,31 @@ class SquirrelTest {
     }
 
     @Test
-    fun switchesLoopsDirectlyWithFade() {
+    fun loopFinishesBeforeSwitch() {
         val p = SquirrelPlayer()
         val d = p.frameDurationMs(SquirrelClip.IDLE, 0)
         p.advance(d * 2.5, SquirrelMode.IDLE, 0)
         assertEquals(2, p.frame)
         assertEquals(0.5, p.progress, 0.01)
         assertEquals(3, p.nextFrame)
+        // Ny tilstand: hvile spilles ferdig først
+        p.advance(1.0, SquirrelMode.CLIMB, 65)
+        assertEquals(SquirrelClip.IDLE, p.clip)
+        assertEquals(SquirrelClip.CLIMB, p.pending)
+        p.advance(d * 4, SquirrelMode.CLIMB, 65)
+        assertEquals(SquirrelClip.IDLE, p.clip)
+        assertEquals(6, p.frame)
+        p.advance(d, SquirrelMode.CLIMB, 65)
+        assertEquals(7, p.frame)
+        assertEquals(null, p.nextFrame) // ingen blanding inn i et annet klipp
+        p.advance(d, SquirrelMode.CLIMB, 65)
+        assertEquals(SquirrelClip.CLIMB, p.clip)
+        assertEquals(0, p.frame)
+        assertEquals(null, p.pending)
+        // Tilbake før løkka er ferdig: ingen bytte
+        p.advance(1.0, SquirrelMode.IDLE, 0)
         p.advance(1.0, SquirrelMode.CLIMB, 65)
         assertEquals(SquirrelClip.CLIMB, p.clip)
-        assertEquals(SquirrelClip.IDLE to 2, p.fadeFrom)
-        p.advance(125.0, SquirrelMode.CLIMB, 65)
-        assertEquals(0.5, p.fadeAlpha, 0.02)
-        p.advance(200.0, SquirrelMode.CLIMB, 65)
-        assertEquals(null, p.fadeFrom)
-        // Siste bilde blandes mot første
-        repeat(20) { p.advance(p.frameDurationMs(p.clip, 65, p.frame), SquirrelMode.CLIMB, 65) }
-        assertEquals((p.frame + 1) % 8, p.nextFrame)
+        assertEquals(null, p.pending)
     }
 }

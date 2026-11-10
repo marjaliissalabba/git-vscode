@@ -29,8 +29,8 @@ import androidx.compose.ui.unit.sp
 /**
  * Ekornet på fast plass ved måleren. Watt/FTP og rpm velger tilstand:
  * står og puster (pause/lav aktivitet), løper (jevnt), løper fort og sprettende
- * (høy rpm og innsats) eller klatrer (høy watt og lav rpm). Ved bytte tones forrige
- * løkke ut over den nye. Med reaksjonstid (standard 3 s) jevnes målingene ut og ekornet
+ * (høy rpm og innsats) eller klatrer (høy watt og lav rpm). En løkke spilles ferdig
+ * før ekornet bytter. Med reaksjonstid (standard 3 s) jevnes målingene ut og ekornet
  * bytter bare når en ny tilstand holder seg. Tersklene justeres under Profil → Ekornet.
  */
 @Composable
@@ -59,8 +59,6 @@ fun SquirrelAnimation(
     val bl by rememberUpdatedState(blend)
     var next by remember { mutableStateOf<Int?>(null) }
     var alpha by remember { mutableStateOf(0f) }
-    var fadeFrom by remember { mutableStateOf<Pair<SquirrelClip, Int>?>(null) }
-    var fadeAlpha by remember { mutableStateOf(0f) }
     var mode by remember { mutableStateOf(SquirrelMode.IDLE) }
 
     LaunchedEffect(Unit) {
@@ -73,7 +71,6 @@ fun SquirrelAnimation(
                     mode = target
                     shown = player.advance(dt, target, director.animRpm)
                     if (bl) { next = player.nextFrame; alpha = player.progress.toFloat() } else next = null
-                    fadeFrom = player.fadeFrom; fadeAlpha = player.fadeAlpha.toFloat()
                 }
                 last = t
             }
@@ -97,18 +94,6 @@ fun SquirrelAnimation(
                         contentDescription = null,
                         filterQuality = FilterQuality.High,
                         alpha = alpha,
-                        modifier = Modifier.size(size),
-                    )
-                }
-                // Bytte mellom løkker: forrige bilde tones ut over det nye
-                val ff = fadeFrom
-                val old = ff?.let { frames[it.first] }
-                if (ff != null && !old.isNullOrEmpty() && fadeAlpha > 0.02f) {
-                    Image(
-                        bitmap = old[ff.second.coerceIn(0, old.lastIndex)],
-                        contentDescription = null,
-                        filterQuality = FilterQuality.High,
-                        alpha = fadeAlpha,
                         modifier = Modifier.size(size),
                     )
                 }

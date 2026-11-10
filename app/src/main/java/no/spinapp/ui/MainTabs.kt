@@ -803,7 +803,7 @@ private fun SquirrelCard(ftp: Int) {
         ToggleRow("Vis ekornet under økta", "Animasjonen til venstre for måleren.", enabled) { enabled = it; AppState.squirrelEnabled = it }
         if (!enabled) return@SpinCard
         var blend by remember { mutableStateOf(AppState.squirrelBlend) }
-        ToggleRow("Myk blanding mellom bilder", "Toner hvert bilde over i det neste, så ekornet hakker mindre.", blend) { blend = it; AppState.squirrelBlend = it }
+        ToggleRow("Myk blanding mellom bilder", "Toner hvert bilde over i det neste. Mykere, men kan se ut som doble bilder.", blend) { blend = it; AppState.squirrelBlend = it }
         Spacer(Modifier.height(6.dp))
         Muted("Ekornet ved måleren viser hvordan du sykler: står og puster, løper, løper fort og sprettende, eller løper rett opp (klatrer). Prøv verdier her:", 14, C.n300)
         Spacer(Modifier.height(10.dp))
