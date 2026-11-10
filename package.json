@@ -1,7 +1,7 @@
 {
-  "name": "lastebors",
-  "version": "1.0.0",
-  "description": "Lastebørs – anbudsapp for transportlaster med prekvalifiserte transportører",
+  "name": "lastbors-norden",
+  "version": "2.0.0",
+  "description": "Lastbørs Norden – last ut til prekvalifiserte transportører, til fastpris eller på lukket anbud",
   "private": true,
   "type": "commonjs",
   "engines": { "node": ">=22.13" },

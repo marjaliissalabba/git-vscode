@@ -1,49 +1,45 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { evaluate, expiringSoon, BASE_REQUIREMENTS } = require('../server/qualification');
+const { evaluate, lockedText, docStatus, expiringSoon, normalizeRequirements } = require('../server/qualification');
 
 const now = new Date('2026-06-01T12:00:00');
-const approved = (code, valid_until = '2027-01-01') => ({ type_code: code, status: 'approved', valid_until });
-const base = BASE_REQUIREMENTS.map(c => approved(c));
+const ok = (type, valid_until = '2027-01-01') => ({ type, status: 'approved', valid_until });
+const company = { blocked: 0 };
 
-test('godkjent firma med alle grunnkrav er kvalifisert', () => {
-  const r = evaluate({ status: 'approved' }, base, [], now);
-  assert.equal(r.qualified, true);
-  assert.deepEqual(r.missing, []);
+test('løyve er alltid et krav', () => {
+  assert.deepEqual(normalizeRequirements([]), ['lov']);
+  assert.deepEqual(normalizeRequirements(['adr', 'avf', 'xxx']), ['lov', 'avf', 'adr']);
 });
 
-test('firma som ikke er godkjent er ikke kvalifisert selv med alle dokumenter', () => {
-  const r = evaluate({ status: 'pending' }, base, [], now);
+test('godkjent løyve gir tilgang til laster uten ekstra krav', () => {
+  assert.equal(evaluate(company, [ok('lov')], [], now).qualified, true);
+  assert.equal(evaluate(company, [], [], now).qualified, false);
+});
+
+test('alle lastens krav må være godkjent', () => {
+  const r = evaluate(company, [ok('lov'), ok('avf')], ['avf', 'adr'], now);
   assert.equal(r.qualified, false);
-  assert.equal(r.companyApproved, false);
+  assert.equal(lockedText(r), 'Krever ADR');
+  assert.equal(lockedText(evaluate(company, [], ['avf'], now)), 'Krever løyve + avfallstransportør');
 });
 
-test('lastens ekstra krav må være oppfylt', () => {
-  const r = evaluate({ status: 'approved' }, base, ['ADR'], now);
+test('status: til kontroll, avvist og utløpt teller ikke', () => {
+  assert.equal(docStatus({ status: 'pending' }, now), 'pending');
+  assert.equal(docStatus({ status: 'rejected' }, now), 'rejected');
+  assert.equal(docStatus(ok('lov', '2026-05-31'), now), 'expired');
+  assert.equal(docStatus(ok('lov', '2026-06-01'), now), 'approved', 'gyldig ut dagen');
+  assert.equal(docStatus(undefined, now), 'missing');
+  assert.equal(evaluate(company, [ok('lov', '2026-05-31')], [], now).qualified, false);
+});
+
+test('sperret firma er ikke kvalifisert', () => {
+  const r = evaluate({ blocked: 1 }, [ok('lov')], [], now);
   assert.equal(r.qualified, false);
-  assert.deepEqual(r.missing.map(m => [m.code, m.reason]), [['ADR', 'mangler']]);
-  assert.equal(evaluate({ status: 'approved' }, [...base, approved('ADR')], ['ADR'], now).qualified, true);
+  assert.equal(lockedText(r), 'Firmaet er sperret');
 });
 
-test('utløpte, avviste og ventende dokumenter teller ikke', () => {
-  const quals = [
-    ...base.filter(q => !['FORSIKRING', 'SKATT', 'HMS'].includes(q.type_code)),
-    approved('FORSIKRING', '2026-05-31'),
-    { type_code: 'SKATT', status: 'pending', valid_until: null },
-    { type_code: 'HMS', status: 'rejected', valid_until: null },
-  ];
-  const r = evaluate({ status: 'approved' }, quals, [], now);
-  assert.equal(r.qualified, false);
-  assert.deepEqual(Object.fromEntries(r.missing.map(m => [m.code, m.reason])), { FORSIKRING: 'utløpt', SKATT: 'venter godkjenning', HMS: 'avvist' });
-});
-
-test('dokument som utløper i dag er fortsatt gyldig', () => {
-  const quals = base.map(q => q.type_code === 'LOYVE' ? approved('LOYVE', '2026-06-01') : q);
-  assert.equal(evaluate({ status: 'approved' }, quals, [], now).qualified, true);
-});
-
-test('expiringSoon finner godkjente dokumenter som utløper innen 30 dager', () => {
-  const list = expiringSoon([approved('LOYVE', '2026-06-20'), approved('SKATT', '2026-12-01'), approved('HMS', '2026-05-01')], 30, now);
-  assert.deepEqual(list.map(q => q.type_code), ['LOYVE']);
+test('expiringSoon finner dokumenter som utløper innen 30 dager', () => {
+  const list = expiringSoon([ok('lov', '2026-06-20'), ok('avf', '2026-12-01'), ok('adr', '2026-05-01')], 30, now);
+  assert.deepEqual(list.map(d => d.type), ['lov']);
 });

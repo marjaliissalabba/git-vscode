@@ -1,10 +1,11 @@
 {
-  "name": "Lastebørs – transportanbud",
-  "short_name": "Lastebørs",
+  "name": "Lastbørs Norden",
+  "short_name": "Lastbørs",
+  "description": "Last ut til prekvalifiserte transportører – fastpris eller lukket anbud.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#f4f6f8",
-  "theme_color": "#0f4c5c",
+  "background_color": "#003462",
+  "theme_color": "#003462",
   "lang": "nb",
-  "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+  "icons": [{ "src": "/app-icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
 }
