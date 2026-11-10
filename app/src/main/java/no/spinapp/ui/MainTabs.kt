@@ -316,7 +316,7 @@ private fun OkterTab(onOpen: (Workout) -> Unit, onBuild: () -> Unit) {
 private fun WorkoutSheet(w: Workout, ftp: Int, onStart: (Workout) -> Unit, onEdit: () -> Unit) {
     val original = remember(w) { WorkoutComposer.mainMinutes(w) }
     val options = remember(w) { WorkoutComposer.lengthOptions(w) }
-    // Ekorn-testen skal vise tilstandene med en gang, så den starter uten oppvarming
+    // Figur-testen skal vise tilstandene med en gang, så den starter uten oppvarming
     var warmup by remember { mutableIntStateOf(if (w.id == "ekorntest") 0 else AppState.warmupMinutes) }
     var length by remember(w) { mutableIntStateOf(original) }
     val composed = remember(w, warmup, length) { WorkoutComposer.compose(w, warmup, if (length == original) null else length) }
@@ -616,8 +616,8 @@ private fun ProfilTab(
     SectionTitle("Musikk")
     MusicCard()
 
-    // Ekornet
-    SectionTitle("Ekornet")
+    // Figuren ved måleren
+    SectionTitle("Figuren")
     SquirrelCard(ftp)
 
     // Lagring
@@ -786,7 +786,7 @@ private fun StorageCard() {
 }
 
 
-/** Forhåndsvisning av ekornet og justerbare terskler. */
+/** Figuren ved måleren: valg av figur, forhåndsvisning og justerbare terskler. */
 @Composable
 private fun SquirrelCard(ftp: Int) {
     var th by remember { mutableStateOf(AppState.squirrelThresholds) }
@@ -800,23 +800,27 @@ private fun SquirrelCard(ftp: Int) {
     var enabled by remember { mutableStateOf(AppState.squirrelEnabled) }
 
     SpinCard {
-        ToggleRow("Vis ekornet under økta", "Animasjonen til venstre for måleren.", enabled) { enabled = it; AppState.squirrelEnabled = it }
+        ToggleRow("Vis figuren under økta", "Løper fritt rundt måleren.", enabled) { enabled = it; AppState.squirrelEnabled = it }
         if (!enabled) return@SpinCard
-        var blend by remember { mutableStateOf(AppState.squirrelBlend) }
-        ToggleRow("Myk blanding mellom bilder", "Toner hvert bilde over i det neste. Mykere, men kan se ut som doble bilder.", blend) { blend = it; AppState.squirrelBlend = it }
+        var character by remember { mutableStateOf(AppState.mascotCharacter) }
         Spacer(Modifier.height(6.dp))
-        Muted("Ekornet ved måleren viser hvordan du sykler: står og puster, løper, løper fort og sprettende, eller løper rett opp (klatrer). Prøv verdier her:", 14, C.n300)
+        Segmented(no.spinapp.core.MascotCharacter.entries.map { it.label }, character.ordinal) {
+            character = no.spinapp.core.MascotCharacter.entries[it]; AppState.mascotCharacter = character
+        }
+        Spacer(Modifier.height(10.dp))
+        Muted("Figuren viser hvordan du sykler: står, løper, løper fort og hopper, eller klatrer opp veggen. Prøv verdier her:", 14, C.n300)
+        Spacer(Modifier.height(10.dp))
+        Box(Modifier.fillMaxWidth().height(120.dp).clip(RoundedCornerShape(10.dp)).background(C.n900)) {
+            key(th, character) { MascotLayer(ftp, ftp * testPct / 100, testRpm, paused = false, character = character, figure = 40.dp, modifier = Modifier.fillMaxSize()) }
+        }
         Spacer(Modifier.height(10.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(84.dp).clip(RoundedCornerShape(10.dp)).background(C.n900), contentAlignment = Alignment.Center) {
-                key(th) { SquirrelAnimation(ftp, ftp * testPct / 100, testRpm, paused = false, size = 72.dp, blend = blend) }
-            }
-            Column(Modifier.weight(1f).padding(start = 14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(
                     when (mode) {
-                        no.spinapp.core.SquirrelMode.IDLE -> "Står og puster"
+                        no.spinapp.core.SquirrelMode.IDLE -> "Står"
                         no.spinapp.core.SquirrelMode.RUN -> "Løper"
-                        no.spinapp.core.SquirrelMode.SPRINT -> "Løper fort"
+                        no.spinapp.core.SquirrelMode.SPRINT -> "Løper fort og hopper"
                         no.spinapp.core.SquirrelMode.CLIMB -> "Klatrer"
                     },
                     color = C.n100, fontSize = 16.sp, fontFamily = Inter, fontWeight = FontWeight.Medium,
@@ -831,22 +835,22 @@ private fun SquirrelCard(ftp: Int) {
         }
         if (open) {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Muted("Reaksjonstid: målingene jevnes ut, og ekornet bytter bare når en ny tilstand har holdt seg så lenge", 13, C.accent300)
+                Muted("Reaksjonstid: målingene jevnes ut, og figuren bytter bare når en ny tilstand har holdt seg så lenge", 13, C.accent300)
                 MiniStepper("sekunder", th.delaySec, 1) { save(th.copy(delaySec = it.coerceIn(0, 15))) }
-                Muted("Står og puster: pause, eller kadens under", 13, C.accent300)
+                Muted("Står: pause, eller kadens under", 13, C.accent300)
                 MiniStepper("rpm", th.idleRpm, 5) { save(th.copy(idleRpm = it.coerceIn(0, 60))) }
                 Muted("Oppover (klatrer): mye kraft per tråkk", 13, C.accent300)
                 MiniStepper("minst % av FTP", th.climbPct, 5) { save(th.copy(climbPct = it.coerceIn(0, 300))) }
                 MiniStepper("og høyst rpm", th.climbMaxRpm, 1) { save(th.copy(climbMaxRpm = it.coerceIn(20, 140))) }
                 MiniStepper("slutter under % av FTP", th.climbExitPct, 5) { save(th.copy(climbExitPct = it.coerceIn(0, 300))) }
                 MiniStepper("eller over rpm", th.climbExitRpm, 1) { save(th.copy(climbExitRpm = it.coerceIn(20, 160))) }
-                Muted("Hoppende løp: høy kadens", 13, C.accent300)
+                Muted("Løper fort og hopper: høy kadens", 13, C.accent300)
                 MiniStepper("minst rpm", th.sprintRpm, 1) { save(th.copy(sprintRpm = it.coerceIn(40, 160))) }
                 MiniStepper("eller minst % av FTP", th.sprintAltPct, 5) { save(th.copy(sprintAltPct = it.coerceIn(0, 300))) }
                 MiniStepper("med minst rpm", th.sprintAltRpm, 1) { save(th.copy(sprintAltRpm = it.coerceIn(30, 160))) }
                 MiniStepper("slutter under rpm", th.sprintExitRpm, 1) { save(th.copy(sprintExitRpm = it.coerceIn(30, 160))) }
                 MiniStepper("og under % av FTP", th.sprintExitPct, 5) { save(th.copy(sprintExitPct = it.coerceIn(0, 300))) }
-                Muted("Løper: alt annet. Farten følger kadensen (én runde per pedalomdreining).", 12)
+                Muted("Løper: alt annet. Farten følger kadensen.", 12)
                 LinkText("Tilbakestill til standard") { save(no.spinapp.core.SquirrelThresholds()) }
             }
         }

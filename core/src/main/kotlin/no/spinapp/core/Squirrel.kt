@@ -1,9 +1,9 @@
 package no.spinapp.core
 
 /**
- * Ekornet ved måleren. Målingene (watt/FTP og rpm) velger tilstand, og hver tilstand
- * har sin løkke. En løkke spilles alltid ferdig før ekornet bytter til neste.
- * Startverdiene er foreløpige og kan justeres under Profil → Ekornet.
+ * Figuren ved måleren. Målingene (watt/FTP og rpm) velger tilstand: står, løper,
+ * løper fort og hopper, eller klatrer. Selve bevegelsen ligger i [MascotRunner].
+ * Startverdiene er foreløpige og kan justeres under Profil → Figuren.
  */
 data class SquirrelThresholds(
     /** Står og puster under denne kadensen (eller når økta står på pause). */
@@ -21,30 +21,13 @@ data class SquirrelThresholds(
     /** Hoppende løp slutter under [sprintExitRpm] rpm og under [sprintExitPct] % av FTP. */
     val sprintExitRpm: Int = 95,
     val sprintExitPct: Int = 115,
-    /** Reaksjonstid i sekunder: målingene jevnes ut og en ny tilstand må holde seg så lenge før ekornet bytter. */
+    /** Reaksjonstid i sekunder: målingene jevnes ut og en ny tilstand må holde seg så lenge før figuren bytter. */
     val delaySec: Int = 3,
 )
 
 enum class SquirrelMode { IDLE, RUN, SPRINT, CLIMB }
 
-/** Løkkene i spritepakken (mappenavn = navnet i animations.json), 8 bilder hver. */
-enum class SquirrelClip(val folder: String, val frames: Int) {
-    IDLE("idle", 8),
-    SLOW_RUN("slow_run", 8),
-    FAST_RUN("fast_run", 8),
-    CLIMB("climb", 8);
-
-    companion object {
-        fun loopFor(m: SquirrelMode) = when (m) {
-            SquirrelMode.IDLE -> IDLE
-            SquirrelMode.RUN -> SLOW_RUN
-            SquirrelMode.SPRINT -> FAST_RUN
-            SquirrelMode.CLIMB -> CLIMB
-        }
-    }
-}
-
-/** Velger tilstand ut fra målingene, med hysterese så ekornet ikke blafrer mellom tilstander. */
+/** Velger tilstand ut fra målingene, med hysterese så figuren ikke blafrer mellom tilstander. */
 class SquirrelStateMachine(var thresholds: SquirrelThresholds = SquirrelThresholds()) {
     var mode = SquirrelMode.IDLE
         private set
@@ -85,7 +68,7 @@ class SquirrelStateMachine(var thresholds: SquirrelThresholds = SquirrelThreshol
 }
 
 /**
- * Gjør ekornet rolig: jevner ut watt og rpm over [SquirrelThresholds.delaySec] sekunder,
+ * Gjør figuren rolig: jevner ut watt og rpm over [SquirrelThresholds.delaySec] sekunder,
  * krever at en ny tilstand holder seg like lenge før den tas i bruk, og at hver tilstand
  * vises en stund. Pause gir «står og puster» med en gang.
  */
@@ -133,82 +116,5 @@ class SquirrelDirector(thresholds: SquirrelThresholds = SquirrelThresholds()) {
             }
         }
         return mode
-    }
-}
-
-/**
- * Spiller av løkkene. Ved tilstandsbytte spilles løkka som vises ferdig (til siste bilde),
- * og så starter den nye løkka på første bilde. Ingen toning, så det blir aldri doble bilder.
- */
-class SquirrelPlayer(
-    /**
-     * Varighet i ms per bilde fra Ekorn Sprite-studio (timing.json). For hvile brukes tallene
-     * direkte; for løp og klatring er de rytme (relative lengder), mens kadensen styrer farten.
-     */
-    var timings: Map<SquirrelClip, DoubleArray> = emptyMap(),
-) {
-    var clip = SquirrelClip.IDLE
-        private set
-    var frame = 0
-        private set
-    private var elapsedMs = 0.0
-    private var curDurMs = 1.0
-
-    /** Løkka som venter på at den viste skal bli ferdig, eller null. */
-    var pending: SquirrelClip? = null
-        private set
-
-    /** Hvor langt (0–1) det viste bildet har kommet mot neste. Brukes til myk blanding. */
-    val progress: Double get() = (elapsedMs / curDurMs).coerceIn(0.0, 1.0)
-
-    /** Neste bilde i samme løkke, eller null når løkka er ferdig og en annen tar over. */
-    val nextFrame: Int? get() = if (frame == clip.frames - 1 && pending != null) null else (frame + 1) % clip.frames
-
-    /**
-     * Varighet per bilde i ms. Løkkene følger kadensen ut fra spritepakkens anbefalte fart:
-     * rolig løp 10 bilder/s ved 85 rpm, raskt løp 16 bilder/s ved 105 rpm (≈ 18 ved 116 rpm),
-     * klatring 10 bilder/s ved 65 rpm. Hvile 6 bilder/s.
-     */
-    fun frameDurationMs(c: SquirrelClip, rpm: Int?, frame: Int = 0): Double {
-        val base = baseDurationMs(c, rpm)
-        val t = timings[c] ?: return base
-        if (t.isEmpty()) return base
-        val d = t[frame.coerceIn(0, t.lastIndex)]
-        return when (c) {
-            SquirrelClip.IDLE -> d
-            else -> base * d / t.average()
-        }.coerceAtLeast(10.0)
-    }
-
-    private fun baseDurationMs(c: SquirrelClip, rpm: Int?): Double {
-        val r = (rpm ?: 0).toDouble()
-        val fps = when (c) {
-            SquirrelClip.IDLE -> 6.0
-            SquirrelClip.SLOW_RUN -> (10.0 * r / 85.0).coerceIn(5.0, 16.0)
-            SquirrelClip.FAST_RUN -> (16.0 * r / 105.0).coerceIn(10.0, 24.0)
-            SquirrelClip.CLIMB -> (10.0 * r / 65.0).coerceIn(6.0, 14.0)
-        }
-        return 1000.0 / fps
-    }
-
-    /** Går fram [dtMs] millisekunder. Returnerer klipp og bilde som skal vises. */
-    fun advance(dtMs: Double, target: SquirrelMode, rpm: Int?): Pair<SquirrelClip, Int> {
-        val want = SquirrelClip.loopFor(target)
-        pending = if (want != clip) want else null
-        elapsedMs += dtMs
-        var dur = frameDurationMs(clip, rpm, frame)
-        while (elapsedMs >= dur) {
-            elapsedMs -= dur
-            if (frame < clip.frames - 1) {
-                frame++
-            } else {
-                // Løkka er ferdig: bytt nå hvis en annen tilstand venter
-                pending?.let { clip = it; pending = null }
-                frame = 0
-            }
-            dur = frameDurationMs(clip, rpm, frame)
-        }
-        curDurMs = dur
-        return clip to frame
     }
 }

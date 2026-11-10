@@ -319,7 +319,7 @@ fun RideScreen(activity: MainActivity, workout: Workout, onFinished: (RideSummar
 
         StandBanner(state.stand, showSit = state.elapsedSec < sitBannerUntil)
 
-        // 6. Måleren. Målingene kommer ca. én gang i sekundet; tallene, pila og ekornets fart
+        // 6. Måleren. Målingene kommer ca. én gang i sekundet; tallene, pila og figurens fart
         // glides mellom dem så det ikke hakker.
         val smoothW by androidx.compose.animation.core.animateFloatAsState(
             (state.powerW ?: 0).toFloat(), androidx.compose.animation.core.tween(900, easing = androidx.compose.animation.core.LinearEasing), label = "watt")

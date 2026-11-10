@@ -102,16 +102,18 @@ object AppState {
         get() = prefs.getBoolean("spotifyControl", true)
         set(v) = prefs.edit().putBoolean("spotifyControl", v).apply()
 
-    /** Vis ekornet ved måleren under økta. */
+    /** Vis figuren ved måleren under økta. */
     var squirrelEnabled: Boolean
         get() = prefs.getBoolean("squirrelEnabled", true)
         set(v) = prefs.edit().putBoolean("squirrelEnabled", v).apply()
-    var squirrelBlend: Boolean
-        // Av som standard: blanding viser to bilder samtidig (doble bilder)
-        get() = prefs.getBoolean("squirrelBlend2", false)
-        set(v) = prefs.edit().putBoolean("squirrelBlend2", v).apply()
 
-    /** Terskler for ekornet ved måleren (justeres under Profil → Ekornet). Versjon 2 = nye definisjoner. */
+    /** Hvilken figur som løper ved måleren. */
+    var mascotCharacter: no.spinapp.core.MascotCharacter
+        get() = runCatching { no.spinapp.core.MascotCharacter.valueOf(prefs.getString("mascot", null)!!) }
+            .getOrDefault(no.spinapp.core.MascotCharacter.NINJA_FROG)
+        set(v) = prefs.edit().putString("mascot", v.name).apply()
+
+    /** Terskler for figuren ved måleren (justeres under Profil → Figuren). Versjon 2 = nye definisjoner. */
     var squirrelThresholds: no.spinapp.core.SquirrelThresholds
         get() {
             val d = no.spinapp.core.SquirrelThresholds()

@@ -33,14 +33,13 @@ Prøv kildene i denne rekkefølgen: Bluetooth, så ANT+, så kamera.
 - **Neste intervall ⏭** og **Hopp over oppvarming** på øktskjermen.
 - **Øktbygger:** «+ Lag ny økt», eller «Lag egen versjon» av en ferdig økt. Endre navn, tid, % av FTP, kadens og ståperiode per intervall, kopier, flytt og slett. Egne økter lagres bare på telefonen.
 
-## Ekornet og Sprite-studio
+## Figuren ved måleren
 
-- `tools/sprite-studio/index.html` er et redigeringsverktøy for ekornets spritepakke (ankerpunkt og varighet per bilde, løkspeil, forhåndsvisning i appstørrelse). Det lagrer en oppdatert `animations.json`.
-- **Flytt, roter, skaler og speilvend** hvert bilde (dra på lerretet eller skriv tall), for ett bilde eller hele klippet. Angre/gjør om med Ctrl+Z. Importen bruker formen når bildene lages.
-- **Auto-anker** i studioet: sett ankeret på bilde 1, så følger verktøyet samme punkt gjennom resten av klippet (overganger starter fra løkka de kommer fra). **Finn hakk** markerer bilder som endrer seg mye mer enn resten (rød strek i tidslinja).
-- Myk blanding mellom bildene kan slås på under Profil → Ekornet (av som standard, fordi den kan gi doble bilder).
-- Appen bruker bare de fire løkkene (står, løper, løper fort, klatrer). En løkke spilles alltid ferdig før ekornet bytter, uten toning. Overgangene i pakken tas ikke inn.
-- `python3 tools/import_squirrel_sprites.py <mappe>` tar pakken inn i appen: bildene plasseres etter ankerpunktet og varighetene skrives til `assets/squirrel/timing.json`.
+- Figurene er fra **Pixel Adventure 1** av Pixel Frog (CC0, se `app/src/main/assets/mascot/LISENS.txt`). Velg Frosk, Maske, Rosa eller Virtuell under Profil → Figuren.
+- Figuren løper fritt i en boks fra venstre til høyre kant og fra under buen til over buen. Gulvet er under buen.
+- **Står** ved pause eller lav kadens, **løper** fram og tilbake (farten følger kadensen), **løper fort og hopper** (av og til dobbelthopp) ved høy kadens, og **klatrer** opp veggen ved mye kraft og lav kadens, og hopper ut over kanten på toppen.
+- Tersklene og reaksjonstiden justeres under Profil → Figuren. Økta «Figur-test» går gjennom alle tilstandene.
+- Ekorn-verktøyene (`tools/sprite-studio/`, `tools/import_squirrel_sprites.py`) ligger igjen, men brukes ikke av appen nå.
 
 ## Personvern og lagring
 

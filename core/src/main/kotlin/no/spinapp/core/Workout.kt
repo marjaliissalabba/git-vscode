@@ -185,8 +185,8 @@ object WorkoutLibrary {
         cooldown(10)
     }
 
-    /** Kort testøkt som går gjennom alle ekorn-tilstandene og overgangene. */
-    val squirrelTest = workout("ekorntest", "Ekorn-test", "12 min som viser alle ekorn-tilstandene: står, løper, hoppende løp, klatring og overgangene.") {
+    /** Kort testøkt som går gjennom alle figur-tilstandene. */
+    val squirrelTest = workout("ekorntest", "Figur-test", "12 min som viser alle tilstandene til figuren ved måleren: står, løper, løper fort og hopper, og klatrer.") {
         seg("Stå stille – ikke tråkk", 0.75, 0, 5, 0..5)
         seg("Løp – jevnt", 1.5, 60, 70, 85..95)
         seg("Hoppende løp – rask fot", 1.5, 65, 75, 105..115)

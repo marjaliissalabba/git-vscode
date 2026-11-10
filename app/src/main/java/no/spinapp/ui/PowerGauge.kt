@@ -130,14 +130,11 @@ fun PowerGauge(
             }
         }
 
-        // Ekornet (64 × 64) på fast plass til venstre for buen. Er det ikke plass utenfor, legges den i åpningen nede til venstre.
-        val anim = 64.dp
-        val outside = (maxWidth - side) / 2 - anim - 4.dp
-        val x = if (outside >= 0.dp) outside else (maxWidth - side) / 2
-        val y = if (outside >= 0.dp) (maxHeight - anim) / 2 else (maxHeight + side) / 2 - anim
-        if (showSquirrel) SquirrelAnimation(
+        // Figuren løper fritt i en boks: venstre til høyre kant, fra under buen til over buen
+        if (showSquirrel) MascotLayer(
             ftp = ftp, watts = powerW, rpm = cadence, paused = paused, showLabel = showSquirrelLabel,
-            modifier = Modifier.align(Alignment.TopStart).offset(x = x, y = y),
+            figure = (44 * k).coerceIn(32f, 64f).dp,
+            modifier = Modifier.width(maxWidth).height(side),
         )
     }
 }
