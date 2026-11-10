@@ -217,7 +217,7 @@ fun RideScreen(activity: MainActivity, workout: Workout, onFinished: (RideSummar
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         // 1. Statuslinje
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
             val sim = source?.type == no.spinapp.core.SourceType.SIMULATOR
             Row(
                 Modifier.clip(RoundedCornerShape(50)).background(C.n900).border(1.dp, C.n800, RoundedCornerShape(50))
@@ -225,9 +225,10 @@ fun RideScreen(activity: MainActivity, workout: Workout, onFinished: (RideSummar
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Box(Modifier.size(7.dp).clip(CircleShape).background(if (sim) C.accent else C.good))
-                Text(if (sim) "  Simulerer · ingen sykkel" else "  $sourceStatus", color = C.n200, fontSize = 12.sp, fontFamily = Inter, maxLines = 1)
+                Text(if (sim) "  Simulerer · ingen sykkel" else "  $sourceStatus", color = C.n200, fontSize = 12.sp, fontFamily = Inter,
+                    maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
             }
-            Spacer(Modifier.weight(1f))
+            Spacer(Modifier.width(8.dp))
             Text("×  Avslutt", Modifier.clip(RoundedCornerShape(8.dp)).clickable {
                 pausedBeforeEnd = paused; paused = true; endSheet = true
             }.padding(horizontal = 10.dp, vertical = 12.dp), color = C.n400, fontSize = 15.sp, fontFamily = Inter)
@@ -328,6 +329,7 @@ fun RideScreen(activity: MainActivity, workout: Workout, onFinished: (RideSummar
             cadenceLow = seg?.cadenceLow,
             cadenceHigh = seg?.cadenceHigh,
             cadenceStatus = state.cadenceStatus,
+            standing = state.stand.standing,
             modifier = Modifier.fillMaxWidth().weight(1f),
         )
 

@@ -1,0 +1,14 @@
+Animasjon til venstre for måleren (64 x 64 dp, ca. 192 x 192 px på telefonen din).
+
+Legg bildene i én mappe per tilstand. Alle bildene i en mappe er ÉN pedalomdreining,
+sortert på filnavn (00.png, 01.png, ...). Farten følger kadensen (90 rpm = 1,5 runder/s).
+
+  rolig/    under 76 % av FTP   (Z1-Z2)
+  middels/  76-105 %            (Z3-Z5)
+  hard/     106-150 %           (Z6-Z7)
+  sprint/   over 150 %          (Z8)
+  staa/     når økta sier «stå opp»
+  pause/    ved 0 rpm
+
+Mangler en mappe, brukes nærmeste som finnes. PNG eller WebP med gjennomsiktig bakgrunn.
+Anbefalt: 8-16 bilder per runde, 192 x 192 px.

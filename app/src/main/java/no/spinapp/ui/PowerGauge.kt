@@ -28,6 +28,8 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.foundation.layout.offset
 import androidx.compose.ui.unit.sp
 import no.spinapp.core.TargetStatus
 import no.spinapp.core.Zone
@@ -59,6 +61,7 @@ fun PowerGauge(
     cadenceLow: Int?,
     cadenceHigh: Int?,
     cadenceStatus: TargetStatus,
+    standing: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     val pct: Double? = powerW?.let { it * 100.0 / ftp }
@@ -71,6 +74,9 @@ fun PowerGauge(
     BoxWithConstraints(modifier, contentAlignment = Alignment.Center) {
         val side = min(maxWidth.value, maxHeight.value).dp
         val k = side.value / 300f
+        // Tekststørrelser i dp, så telefonens skriftstørrelse ikke presser tallene inn i buen
+        val density = LocalDensity.current
+        fun fs(v: Float) = with(density) { (v * k).dp.toSp() }
 
         Canvas(Modifier.size(side)) {
             val u = size.minDimension / 300f          // 128 px radius i en 300 px boks
@@ -101,22 +107,36 @@ fun PowerGauge(
             if (pct != null) drawPointer(ang(pointer), r - 16f * u, 20f * u)
         }
 
-        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(top = side * 0.03f)) {
-            Text(pct?.let { "${it.roundToInt()}%" } ?: "–", color = C.n100, fontSize = (64 * k).sp,
-                fontWeight = FontWeight.SemiBold, fontFamily = Inter, lineHeight = (68 * k).sp)
-            Text("${powerW ?: "–"} W", color = C.n100, fontSize = (24 * k).sp, fontWeight = FontWeight.SemiBold, fontFamily = Inter)
-            Text(zone?.short ?: "av FTP", color = zone?.let { Color(it.argb) } ?: C.n500, fontSize = (16 * k).sp, fontFamily = Inter)
-            Box(Modifier.padding(vertical = (8 * k).dp).width((26 * k).dp).height(1.dp).background(C.n600))
+        // Innholdet i midten holdes innenfor buen (radius 128 av 300) og går litt ned i åpningen nederst
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.padding(top = side * 0.10f),
+        ) {
+            Text(pct?.let { "${it.roundToInt()}%" } ?: "–", color = C.n100, fontSize = fs(52f),
+                fontWeight = FontWeight.SemiBold, fontFamily = Inter, lineHeight = fs(56f))
+            Text("${powerW ?: "–"} W", color = C.n100, fontSize = fs(20f), fontWeight = FontWeight.SemiBold, fontFamily = Inter, lineHeight = fs(24f))
+            Text(zone?.short ?: "av FTP", color = zone?.let { Color(it.argb) } ?: C.n500, fontSize = fs(14f), fontFamily = Inter, lineHeight = fs(18f))
+            Box(Modifier.padding(vertical = (7 * k).dp).width((24 * k).dp).height(1.dp).background(C.n600))
             val off = cadenceStatus == TargetStatus.LOW || cadenceStatus == TargetStatus.HIGH
             Row(verticalAlignment = Alignment.Bottom) {
-                Text("${cadence ?: "–"}", color = if (off) C.warn else C.n100, fontSize = (34 * k).sp,
-                    fontWeight = FontWeight.SemiBold, fontFamily = Inter)
-                Text(" rpm", color = C.n400, fontSize = (16 * k).sp, fontFamily = Inter, modifier = Modifier.padding(bottom = (5 * k).dp))
+                Text("${cadence ?: "–"}", color = if (off) C.warn else C.n100, fontSize = fs(30f),
+                    fontWeight = FontWeight.SemiBold, fontFamily = Inter, lineHeight = fs(34f))
+                Text(" rpm", color = C.n400, fontSize = fs(13f), fontFamily = Inter, modifier = Modifier.padding(bottom = (5 * k).dp))
             }
             if (cadenceLow != null && cadenceHigh != null) {
-                Text("mål $cadenceLow–$cadenceHigh", color = C.n400, fontSize = (14 * k).sp, fontFamily = Inter)
+                Text("mål $cadenceLow–$cadenceHigh", color = C.n400, fontSize = fs(12f), fontFamily = Inter)
             }
         }
+
+        // Animasjon (64 × 64) til venstre for buen. Er det ikke plass utenfor, legges den i åpningen nede til venstre.
+        val anim = 64.dp
+        val outside = (maxWidth - side) / 2 - anim - 4.dp
+        val x = if (outside >= 0.dp) outside else (maxWidth - side) / 2
+        val y = if (outside >= 0.dp) (maxHeight - anim) / 2 else (maxHeight + side) / 2 - anim
+        RiderAnimation(
+            ftp = ftp, watts = powerW, rpm = cadence, standing = standing,
+            modifier = Modifier.align(Alignment.TopStart).offset(x = x, y = y),
+        )
     }
 }
 
