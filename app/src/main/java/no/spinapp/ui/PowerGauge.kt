@@ -61,7 +61,7 @@ fun PowerGauge(
     cadenceLow: Int?,
     cadenceHigh: Int?,
     cadenceStatus: TargetStatus,
-    standing: Boolean = false,
+    paused: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     val pct: Double? = powerW?.let { it * 100.0 / ftp }
@@ -128,13 +128,13 @@ fun PowerGauge(
             }
         }
 
-        // Animasjon (64 × 64) til venstre for buen. Er det ikke plass utenfor, legges den i åpningen nede til venstre.
+        // Ekornet (64 × 64) på fast plass til venstre for buen. Er det ikke plass utenfor, legges den i åpningen nede til venstre.
         val anim = 64.dp
         val outside = (maxWidth - side) / 2 - anim - 4.dp
         val x = if (outside >= 0.dp) outside else (maxWidth - side) / 2
         val y = if (outside >= 0.dp) (maxHeight - anim) / 2 else (maxHeight + side) / 2 - anim
-        RiderAnimation(
-            ftp = ftp, watts = powerW, rpm = cadence, standing = standing,
+        SquirrelAnimation(
+            ftp = ftp, watts = powerW, rpm = cadence, paused = paused,
             modifier = Modifier.align(Alignment.TopStart).offset(x = x, y = y),
         )
     }

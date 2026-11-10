@@ -1,0 +1,65 @@
+{
+  "inputs": {
+    "watts": "current_power_w",
+    "rpm": "current_cadence_rpm",
+    "ftp": "configured_ftp_watts",
+    "paused": "workout_paused"
+  },
+  "derived": {
+    "intensity_ratio": "watts / ftp"
+  },
+  "states": {
+    "idle": {
+      "enter": "paused OR (rpm < 20 AND intensity_ratio < 0.20)",
+      "animation": "idle"
+    },
+    "run": {
+      "enter": "active; default moving state",
+      "animation": "run"
+    },
+    "sprint_bouncy": {
+      "enter": "rpm >= 85 AND intensity_ratio >= 0.35 OR (intensity_ratio >= 1.00 AND rpm >= 65)",
+      "exit": "rpm < 78 AND intensity_ratio < 0.90",
+      "animation": "sprint_bouncy"
+    },
+    "climb_loop": {
+      "enter": "intensity_ratio >= 0.85 AND rpm <= 65",
+      "exit": "intensity_ratio < 0.78 OR rpm > 72",
+      "animation": "climb_loop"
+    }
+  },
+  "transitions": [
+    {
+      "from": [
+        "run",
+        "sprint_bouncy"
+      ],
+      "to": "climb_loop",
+      "play_once": "run_to_climb",
+      "trigger": "climb_loop enter condition becomes true"
+    },
+    {
+      "from": "climb_loop",
+      "to": "run",
+      "play_once": "climb_over_crest_to_run",
+      "trigger": "climb_loop exit condition becomes true"
+    },
+    {
+      "note": "If the app has a route grade or workout segment signal, use it to identify the hill and crest. Otherwise the watt/FTP and RPM conditions are only a visual heuristic."
+    }
+  ],
+  "motion": {
+    "run_frame_duration_ms": "map rpm 30..110 to 160..80 and clamp",
+    "idle_frame_duration_ms": 250,
+    "climb_frame_duration_ms": 130,
+    "sprint_frame_duration_ms": 85,
+    "transition_frame_duration_ms": 120
+  },
+  "notes": [
+    "Thresholds are editable example defaults, not personalized training advice.",
+    "FTP must be set above zero before calculating intensity_ratio.",
+    "Keep transition clips one-shot; only idle/run/sprint_bouncy/climb_loop are loops.",
+    "The climb loop is authored as a forward-and-back cycle to make its seam continuous.",
+    "Pause overrides all motion and selects idle."
+  ]
+}

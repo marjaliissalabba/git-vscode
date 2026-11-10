@@ -102,6 +102,43 @@ object AppState {
         get() = prefs.getBoolean("spotifyControl", true)
         set(v) = prefs.edit().putBoolean("spotifyControl", v).apply()
 
+    /** Terskler for ekornet ved måleren (justeres under Profil → Ekornet). */
+    var squirrelThresholds: no.spinapp.core.SquirrelThresholds
+        get() {
+            val d = no.spinapp.core.SquirrelThresholds()
+            fun g(k: String, v: Int) = prefs.getInt("sq_$k", v)
+            return no.spinapp.core.SquirrelThresholds(
+                idleRpm = g("idleRpm", d.idleRpm),
+                idlePct = g("idlePct", d.idlePct),
+                sprintRpm = g("sprintRpm", d.sprintRpm),
+                sprintPct = g("sprintPct", d.sprintPct),
+                sprintAltPct = g("sprintAltPct", d.sprintAltPct),
+                sprintAltRpm = g("sprintAltRpm", d.sprintAltRpm),
+                sprintExitRpm = g("sprintExitRpm", d.sprintExitRpm),
+                sprintExitPct = g("sprintExitPct", d.sprintExitPct),
+                climbPct = g("climbPct", d.climbPct),
+                climbMaxRpm = g("climbMaxRpm", d.climbMaxRpm),
+                climbExitPct = g("climbExitPct", d.climbExitPct),
+                climbExitRpm = g("climbExitRpm", d.climbExitRpm),
+            )
+        }
+        set(t) {
+            prefs.edit()
+                .putInt("sq_idleRpm", t.idleRpm)
+                .putInt("sq_idlePct", t.idlePct)
+                .putInt("sq_sprintRpm", t.sprintRpm)
+                .putInt("sq_sprintPct", t.sprintPct)
+                .putInt("sq_sprintAltPct", t.sprintAltPct)
+                .putInt("sq_sprintAltRpm", t.sprintAltRpm)
+                .putInt("sq_sprintExitRpm", t.sprintExitRpm)
+                .putInt("sq_sprintExitPct", t.sprintExitPct)
+                .putInt("sq_climbPct", t.climbPct)
+                .putInt("sq_climbMaxRpm", t.climbMaxRpm)
+                .putInt("sq_climbExitPct", t.climbExitPct)
+                .putInt("sq_climbExitRpm", t.climbExitRpm)
+                .apply()
+        }
+
     /** Ønsket oppvarming i minutter (legges foran alle økter). */
     var warmupMinutes: Int
         get() = prefs.getInt("warmupMinutes", 10)

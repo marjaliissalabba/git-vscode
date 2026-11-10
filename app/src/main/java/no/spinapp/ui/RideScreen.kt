@@ -329,7 +329,7 @@ fun RideScreen(activity: MainActivity, workout: Workout, onFinished: (RideSummar
             cadenceLow = seg?.cadenceLow,
             cadenceHigh = seg?.cadenceHigh,
             cadenceStatus = state.cadenceStatus,
-            standing = state.stand.standing,
+            paused = paused,
             modifier = Modifier.fillMaxWidth().weight(1f),
         )
 

@@ -31,6 +31,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -614,6 +615,10 @@ private fun ProfilTab(
     SectionTitle("Musikk")
     MusicCard()
 
+    // Ekornet
+    SectionTitle("Ekornet")
+    SquirrelCard(ftp)
+
     // Lagring
     SectionTitle("Lagring")
     StorageCard()
@@ -776,5 +781,77 @@ private fun StorageCard() {
                 color = C.bad, fontSize = 14.sp, fontFamily = Inter,
             )
         }
+    }
+}
+
+
+/** Forhåndsvisning av ekornet og justerbare terskler. */
+@Composable
+private fun SquirrelCard(ftp: Int) {
+    var th by remember { mutableStateOf(AppState.squirrelThresholds) }
+    var testPct by remember { mutableIntStateOf(60) }
+    var testRpm by remember { mutableIntStateOf(85) }
+    var open by remember { mutableStateOf(false) }
+    val sm = remember { no.spinapp.core.SquirrelStateMachine(th) }
+    sm.thresholds = th
+    val mode = sm.update(ftp * testPct / 100, testRpm, ftp, paused = false)
+    fun save(t: no.spinapp.core.SquirrelThresholds) { th = t; AppState.squirrelThresholds = t }
+
+    SpinCard {
+        Muted("Ekornet ved måleren viser hvordan du sykler: står og puster, løper, løper fort og sprettende, eller klatrer. Prøv verdier her:", 14, C.n300)
+        Spacer(Modifier.height(10.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(84.dp).clip(RoundedCornerShape(10.dp)).background(C.n900), contentAlignment = Alignment.Center) {
+                key(th) { SquirrelAnimation(ftp, ftp * testPct / 100, testRpm, paused = false, size = 72.dp) }
+            }
+            Column(Modifier.weight(1f).padding(start = 14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    when (mode) {
+                        no.spinapp.core.SquirrelMode.IDLE -> "Står og puster"
+                        no.spinapp.core.SquirrelMode.RUN -> "Løper"
+                        no.spinapp.core.SquirrelMode.SPRINT -> "Løper fort"
+                        no.spinapp.core.SquirrelMode.CLIMB -> "Klatrer"
+                    },
+                    color = C.n100, fontSize = 16.sp, fontFamily = Inter, fontWeight = FontWeight.Medium,
+                )
+                MiniStepper("% av FTP", testPct, 5) { testPct = it.coerceIn(0, 200) }
+                MiniStepper("rpm", testRpm, 5) { testRpm = it.coerceIn(0, 140) }
+            }
+        }
+        Row(Modifier.clickable { open = !open }.padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(if (open) Ico.CaretDown else Ico.CaretRight, C.n400, 14.dp)
+            Muted("  Terskler (foreløpige, kan justeres)", 14, C.n300)
+        }
+        if (open) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Muted("Står og puster", 13, C.accent300)
+                MiniStepper("under rpm", th.idleRpm, 5) { save(th.copy(idleRpm = it.coerceIn(0, 60))) }
+                MiniStepper("og under % FTP", th.idlePct, 5) { save(th.copy(idlePct = it.coerceIn(0, 100))) }
+                Muted("Løper fort", 13, C.accent300)
+                MiniStepper("fra rpm", th.sprintRpm, 1) { save(th.copy(sprintRpm = it.coerceIn(40, 140))) }
+                MiniStepper("og fra % FTP", th.sprintPct, 5) { save(th.copy(sprintPct = it.coerceIn(0, 200))) }
+                MiniStepper("eller fra % FTP", th.sprintAltPct, 5) { save(th.copy(sprintAltPct = it.coerceIn(0, 300))) }
+                MiniStepper("med minst rpm", th.sprintAltRpm, 1) { save(th.copy(sprintAltRpm = it.coerceIn(30, 140))) }
+                MiniStepper("slutter under rpm", th.sprintExitRpm, 1) { save(th.copy(sprintExitRpm = it.coerceIn(30, 140))) }
+                MiniStepper("og under % FTP", th.sprintExitPct, 5) { save(th.copy(sprintExitPct = it.coerceIn(0, 300))) }
+                Muted("Klatrer", 13, C.accent300)
+                MiniStepper("fra % FTP", th.climbPct, 5) { save(th.copy(climbPct = it.coerceIn(0, 300))) }
+                MiniStepper("og høyst rpm", th.climbMaxRpm, 1) { save(th.copy(climbMaxRpm = it.coerceIn(20, 120))) }
+                MiniStepper("slutter under % FTP", th.climbExitPct, 5) { save(th.copy(climbExitPct = it.coerceIn(0, 300))) }
+                MiniStepper("eller over rpm", th.climbExitRpm, 1) { save(th.copy(climbExitRpm = it.coerceIn(20, 140))) }
+                LinkText("Tilbakestill til standard") { save(no.spinapp.core.SquirrelThresholds()) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MiniStepper(label: String, value: Int, step: Int, onChange: (Int) -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+        Text(label, Modifier.weight(1f), color = C.n300, fontSize = 14.sp, fontFamily = Inter)
+        StepButton(false, { onChange(value - step) }, 36.dp)
+        Text("$value", Modifier.width(48.dp), color = C.n100, fontSize = 15.sp, fontFamily = Inter,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+        StepButton(true, { onChange(value + step) }, 36.dp)
     }
 }
