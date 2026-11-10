@@ -13,6 +13,7 @@ Bruk:  python3 tools/import_squirrel_sprites.py <mappe-med-animations.json> [--s
   stille. Uten anker brukes rutens midtpunkt.
 - Form (frames[i].transform: x, y, rotation, scale, flipX fra studioets Flytt/Roter/Skaler) brukes
   rundt ankeret, med dobbel oppløsning underveis for myke kanter.
+- Bare løkkene tas inn. Overgangene hoppes over: appen toner mellom løkkene.
 - Varighet (frames[i].durationMs) skrives til timing.json, som appen bruker som rytme.
 - Skriver app/src/main/assets/squirrel/<klipp>/00.png … og kopierer animations.json og LES_MEG.md.
 """
@@ -67,6 +68,8 @@ def place_transformed(cell, anchor, t, scale, size):
 
 timing = {}
 for clip, c in meta["clips"].items():
+    if not c.get("loop"):
+        continue  # overgangene brukes ikke i appen; den toner mellom løkkene i stedet
     d = os.path.join(out, clip)
     os.makedirs(d)
     sheet = sheets[c["sheet"]]

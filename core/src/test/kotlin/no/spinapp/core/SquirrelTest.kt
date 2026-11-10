@@ -36,50 +36,6 @@ class SquirrelTest {
     }
 
     @Test
-    fun transitionsPlayOnceThenLoop() {
-        val p = SquirrelPlayer()
-        val tr = 1000.0 / 14
-        p.advance(10.0, SquirrelMode.IDLE, 0)
-        assertEquals(SquirrelClip.IDLE, p.clip)
-        p.advance(1.0, SquirrelMode.RUN, 85)
-        assertEquals(SquirrelClip.IDLE_TO_SLOW_RUN, p.clip)
-        p.advance(tr * 6, SquirrelMode.RUN, 85)
-        assertEquals(SquirrelClip.SLOW_RUN, p.clip)
-        p.advance(1.0, SquirrelMode.CLIMB, 65)
-        assertEquals(SquirrelClip.SLOW_RUN_TO_CLIMB, p.clip)
-        p.advance(tr * 6, SquirrelMode.CLIMB, 65)
-        assertEquals(SquirrelClip.CLIMB, p.clip)
-        p.advance(2000.0, SquirrelMode.CLIMB, 65)
-        assertEquals(SquirrelClip.CLIMB, p.clip) // løkke
-        p.advance(1.0, SquirrelMode.SPRINT, 110)
-        assertEquals(SquirrelClip.CLIMB_TO_FAST_RUN, p.clip)
-        p.advance(tr * 6, SquirrelMode.SPRINT, 110)
-        assertEquals(SquirrelClip.FAST_RUN, p.clip)
-    }
-
-    @Test
-    fun everyPairHasATransition() {
-        for (a in SquirrelMode.entries) for (b in SquirrelMode.entries) if (a != b) {
-            kotlin.test.assertNotNull(SquirrelClip.transition(a, b), "$a → $b")
-        }
-    }
-
-    @Test
-    fun transitionIsNotInterrupted() {
-        val p = SquirrelPlayer()
-        p.advance(1.0, SquirrelMode.RUN, 85)          // idle → slow_run
-        p.advance(1000.0, SquirrelMode.RUN, 85)
-        assertEquals(SquirrelClip.SLOW_RUN, p.clip)
-        p.advance(1.0, SquirrelMode.CLIMB, 65)
-        assertEquals(SquirrelClip.SLOW_RUN_TO_CLIMB, p.clip)
-        // Målet endres midt i overgangen: den spilles ferdig, så klatring → rolig løp
-        p.advance(150.0, SquirrelMode.RUN, 85)
-        assertEquals(SquirrelClip.SLOW_RUN_TO_CLIMB, p.clip)
-        p.advance(1000.0 / 14 * 5, SquirrelMode.RUN, 85)
-        assertEquals(SquirrelClip.CLIMB_TO_SLOW_RUN, p.clip)
-    }
-
-    @Test
     fun speedFollowsCadence() {
         val p = SquirrelPlayer()
         assertEquals(100.0, p.frameDurationMs(SquirrelClip.SLOW_RUN, 85), 0.01)
@@ -132,22 +88,22 @@ class SquirrelTest {
     }
 
     @Test
-    fun blendProgress() {
+    fun switchesLoopsDirectlyWithFade() {
         val p = SquirrelPlayer()
         val d = p.frameDurationMs(SquirrelClip.IDLE, 0)
-        p.advance(d * 0.5, SquirrelMode.IDLE, 0)
-        assertEquals(0, p.frame)
+        p.advance(d * 2.5, SquirrelMode.IDLE, 0)
+        assertEquals(2, p.frame)
         assertEquals(0.5, p.progress, 0.01)
-        assertEquals(1, p.nextFrame)
-        // Siste bilde i en løkke blandes mot første
-        repeat(7) { p.advance(d, SquirrelMode.IDLE, 0) }
-        assertEquals(7, p.frame)
-        assertEquals(0, p.nextFrame)
-        // Siste bilde i en overgang blandes ikke
-        p.advance(1.0, SquirrelMode.RUN, 0)
-        assertEquals(SquirrelClip.IDLE_TO_SLOW_RUN, p.clip)
-        repeat(5) { p.advance(p.frameDurationMs(p.clip, 0), SquirrelMode.RUN, 0) }
-        assertEquals(5, p.frame)
-        assertEquals(null, p.nextFrame)
+        assertEquals(3, p.nextFrame)
+        p.advance(1.0, SquirrelMode.CLIMB, 65)
+        assertEquals(SquirrelClip.CLIMB, p.clip)
+        assertEquals(SquirrelClip.IDLE to 2, p.fadeFrom)
+        p.advance(125.0, SquirrelMode.CLIMB, 65)
+        assertEquals(0.5, p.fadeAlpha, 0.02)
+        p.advance(200.0, SquirrelMode.CLIMB, 65)
+        assertEquals(null, p.fadeFrom)
+        // Siste bilde blandes mot første
+        repeat(20) { p.advance(p.frameDurationMs(p.clip, 65, p.frame), SquirrelMode.CLIMB, 65) }
+        assertEquals((p.frame + 1) % 8, p.nextFrame)
     }
 }

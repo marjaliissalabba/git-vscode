@@ -39,6 +39,7 @@ Prøv kildene i denne rekkefølgen: Bluetooth, så ANT+, så kamera.
 - **Flytt, roter, skaler og speilvend** hvert bilde (dra på lerretet eller skriv tall), for ett bilde eller hele klippet. Angre/gjør om med Ctrl+Z. Importen bruker formen når bildene lages.
 - **Auto-anker** i studioet: sett ankeret på bilde 1, så følger verktøyet samme punkt gjennom resten av klippet (overganger starter fra løkka de kommer fra). **Finn hakk** markerer bilder som endrer seg mye mer enn resten (rød strek i tidslinja).
 - Appen blander hvert bilde mykt over i det neste (kan slås av under Profil → Ekornet).
+- Appen bruker bare de fire løkkene (står, løper, løper fort, klatrer). Ved bytte tones forrige løkke ut over den nye; overgangene i pakken tas ikke inn.
 - `python3 tools/import_squirrel_sprites.py <mappe>` tar pakken inn i appen: bildene plasseres etter ankerpunktet og varighetene skrives til `assets/squirrel/timing.json`.
 
 ## Personvern og lagring
