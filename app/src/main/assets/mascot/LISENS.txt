@@ -1,3 +1,6 @@
 Figurene er fra «Pixel Adventure 1» av Pixel Frog
 https://pixelfrog-assets.itch.io/pixel-adventure-1
 Lisens: Creative Commons Zero v1.0 Universal (CC0) – fritt til all bruk, kreditering ikke påkrevd.
+
+Reven (mappen fox/, 24 × 24 per bilde, beskåret) er laget fra et 32 × 32 spriteark som brukeren la inn selv (7 rader: stå, se seg rundt,
+løp, sprang, skvetter, sover, faller). Klatrebildene er løpebildene dreid 90°. Kilde og lisens: sjekk at arket er CC0.

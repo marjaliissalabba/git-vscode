@@ -1,12 +1,15 @@
 package no.spinapp.core
 
 import kotlin.math.abs
+import kotlin.math.atan2
+import kotlin.math.hypot
 import kotlin.math.sqrt
 import kotlin.random.Random
 
 /**
- * Animasjonene i Pixel Adventure 1 (Pixel Frog, CC0): ett ark per animasjon, 32 × 32 px per bilde,
- * figuren vendt mot høyre. Veggbildene har veggen på høyre side.
+ * Animasjonene: ett ark per animasjon med kvadratiske bilder på rad (32 × 32 i Pixel Adventure 1,
+ * 24 × 24 for reven), figuren vendt mot høyre. Veggbildene har veggen på høyre side.
+ * [frames] er standardantallet; appen leser det faktiske antallet fra arkene.
  */
 enum class MascotAnim(val file: String, val frames: Int, val loop: Boolean) {
     IDLE("idle", 11, true),
@@ -17,13 +20,30 @@ enum class MascotAnim(val file: String, val frames: Int, val loop: Boolean) {
     WALL("wall_jump", 5, true),
 }
 
-/** Figurene i pakken (mappenavn og navn i appen). */
-enum class MascotCharacter(val folder: String, val label: String) {
+/**
+ * Figurene (mappenavn, navn i appen og fart på bildene i forhold til Pixel Adventure, som er
+ * laget for 20 bilder/s). Antall bilder per animasjon leses fra arkene (bredde / 32).
+ */
+enum class MascotCharacter(val folder: String, val label: String, val fpsScale: Double = 1.0) {
     NINJA_FROG("ninja_frog", "Frosk"),
     MASK_DUDE("mask_dude", "Maske"),
     PINK_MAN("pink_man", "Rosa"),
     VIRTUAL_GUY("virtual_guy", "Virtuell"),
+    FOX("fox", "Rev", 0.5),
 }
+
+/**
+ * Buen som hindring: en ring rundt ([cxFrac] × bredde, [cyFrac] × høyde fra toppen) med indre og
+ * ytre radius som andel av boksens høyde. Vinkler som i Compose: 0° = klokka 3, med klokka.
+ */
+data class MascotArc(
+    val cxFrac: Double = 0.5,
+    val cyFrac: Double = 0.5,
+    val rInFrac: Double,
+    val rOutFrac: Double,
+    val startDeg: Double,
+    val sweepDeg: Double,
+)
 
 /**
  * Lar figuren bevege seg fritt i en boks (bredde [w] × høyde [h], målt i figurstørrelser).
@@ -34,6 +54,14 @@ enum class MascotCharacter(val folder: String, val label: String) {
  * - klatrer: løper til nærmeste vegg og klatrer opp; på toppen hopper den ut og lander på gulvet
  */
 class MascotRunner(private val rnd: Random = Random.Default) {
+    /** Antall bilder per animasjon for figuren som vises (fra arkene). */
+    var frameCounts: Map<MascotAnim, Int> = emptyMap()
+    /** Fart på bildene i forhold til standard (se [MascotCharacter.fpsScale]). */
+    var fpsScale = 1.0
+    /** Buen som figuren spretter av når den er i lufta, eller null. */
+    var arc: MascotArc? = null
+    private fun count(a: MascotAnim) = (frameCounts[a] ?: a.frames).coerceAtLeast(1)
+
     /** Venstre kant, i figurstørrelser fra venstre side av boksen. */
     var x = 0.0
         private set
@@ -59,7 +87,11 @@ class MascotRunner(private val rnd: Random = Random.Default) {
 
     private val g = 32.0 // figurstørrelser per s²
 
+    private var boxW = 1.0
+    private var boxH = 1.0
+
     fun update(dtMs: Double, mode: SquirrelMode, rpm: Int?, w: Double, h: Double) {
+        boxW = w; boxH = h
         val dt = (dtMs / 1000.0).coerceIn(0.0, 0.1)
         val maxX = (w - 1).coerceAtLeast(0.0)
         val maxY = (h - 1).coerceAtLeast(0.0)
@@ -132,6 +164,7 @@ class MascotRunner(private val rnd: Random = Random.Default) {
         if (x >= maxX) { x = maxX; vx = -abs(vx); facingRight = false }
         if (x <= 0.0) { x = 0.0; vx = abs(vx); facingRight = true }
         if (y >= maxY) { y = maxY; if (vy > 0) vy = 0.0 }
+        bounceOffArc()
         // På toppen av hoppet: noen ganger dobbelthopp når den løper fort
         if (before > 0 && vy <= 0 && mode == SquirrelMode.SPRINT && !doubled) {
             doubled = true
@@ -149,7 +182,7 @@ class MascotRunner(private val rnd: Random = Random.Default) {
             setAnim(if (mode == SquirrelMode.IDLE) MascotAnim.IDLE else MascotAnim.RUN)
             return
         }
-        if (anim == MascotAnim.DOUBLE_JUMP && frame < anim.frames - 1) return
+        if (anim == MascotAnim.DOUBLE_JUMP && frame < count(anim) - 1) return
         setAnim(if (vy > 0) MascotAnim.JUMP else MascotAnim.FALL)
     }
 
@@ -176,8 +209,43 @@ class MascotRunner(private val rnd: Random = Random.Default) {
         }
     }
 
+    /**
+     * Treffer figuren buen i lufta, spretter den av som fra en vegg: farten speiles om
+     * buens normal (snur), og figuren skyves ut av buen.
+     */
+    private fun bounceOffArc() {
+        val a = arc ?: return
+        val rad = 0.38
+        val fx = x + 0.5
+        val fy = y + 0.5
+        val cx = a.cxFrac * boxW
+        val cy = boxH * (1 - a.cyFrac)
+        val rIn = a.rInFrac * boxH
+        val rOut = a.rOutFrac * boxH
+        val dx = fx - cx
+        val dy = fy - cy
+        val d = hypot(dx, dy)
+        if (d < 1e-6 || d <= rIn - rad || d >= rOut + rad) return
+        // Vinkel på skjermen (y ned), 0–360
+        val deg = (Math.toDegrees(atan2(-dy, dx)) + 360.0) % 360.0
+        if ((deg - a.startDeg + 720.0) % 360.0 > a.sweepDeg) return
+        val outside = d >= (rIn + rOut) / 2
+        // Normal fra buen mot figuren
+        val nx = if (outside) dx / d else -dx / d
+        val ny = if (outside) dy / d else -dy / d
+        val dot = vx * nx + vy * ny
+        if (dot < 0) {
+            vx -= 2 * dot * nx; vy -= 2 * dot * ny
+            vx *= 0.9; vy *= 0.9
+        }
+        val target = if (outside) rOut + rad else rIn - rad
+        x = cx + dx / d * target - 0.5
+        y = (cy + dy / d * target - 0.5).coerceAtLeast(0.0)
+        if (abs(vx) > 0.05) facingRight = vx > 0
+    }
+
     /** Bilder per sekund. Pakken er laget for 20; løp og klatring følger kadensen. */
-    fun fps(a: MascotAnim = anim, rpm: Int = lastRpm): Double = when (a) {
+    fun fps(a: MascotAnim = anim, rpm: Int = lastRpm): Double = fpsScale * when (a) {
         MascotAnim.RUN -> (20.0 * rpm / 90.0).coerceIn(12.0, 32.0)
         MascotAnim.WALL -> (8.0 + 10.0 * rpm / 65.0).coerceIn(8.0, 24.0)
         else -> 20.0
@@ -186,9 +254,11 @@ class MascotRunner(private val rnd: Random = Random.Default) {
     private fun advanceFrame(dtMs: Double) {
         frameMs += dtMs
         val dur = 1000.0 / fps()
+        val n = count(anim)
+        if (frame >= n) frame = 0
         while (frameMs >= dur) {
             frameMs -= dur
-            frame = if (frame < anim.frames - 1) frame + 1 else if (anim.loop) 0 else frame
+            frame = if (frame < n - 1) frame + 1 else if (anim.loop) 0 else frame
         }
     }
 }

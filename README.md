@@ -35,8 +35,8 @@ Prøv kildene i denne rekkefølgen: Bluetooth, så ANT+, så kamera.
 
 ## Figuren ved måleren
 
-- Figurene er fra **Pixel Adventure 1** av Pixel Frog (CC0, se `app/src/main/assets/mascot/LISENS.txt`). Velg Frosk, Maske, Rosa eller Virtuell under Profil → Figuren.
-- Figuren løper fritt i en boks fra venstre til høyre kant og fra under buen til over buen. Gulvet er under buen.
+- Figurene er fra **Pixel Adventure 1** av Pixel Frog (CC0, se `app/src/main/assets/mascot/LISENS.txt`), pluss en rev fra et eget spriteark. Velg Frosk, Maske, Rosa, Virtuell eller Rev under Profil → Figuren.
+- Figuren løper fritt i en boks fra venstre til høyre kant og fra under buen til over buen. Gulvet er under buen. Hopper den mot buen, spretter den av og snur, som mot veggene.
 - **Står** ved pause eller lav kadens, **løper** fram og tilbake (farten følger kadensen), **løper fort og hopper** (av og til dobbelthopp) ved høy kadens, og **klatrer** opp veggen ved mye kraft og lav kadens, og hopper ut over kanten på toppen.
 - Tersklene og reaksjonstiden justeres under Profil → Figuren. Økta «Figur-test» går gjennom alle tilstandene.
 - Ekorn-verktøyene (`tools/sprite-studio/`, `tools/import_squirrel_sprites.py`) ligger igjen, men brukes ikke av appen nå.

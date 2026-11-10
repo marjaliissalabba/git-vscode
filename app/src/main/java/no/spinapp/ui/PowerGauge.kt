@@ -130,10 +130,13 @@ fun PowerGauge(
             }
         }
 
-        // Figuren løper fritt i en boks: venstre til høyre kant, fra under buen til over buen
+        // Figuren løper fritt i en boks: venstre til høyre kant, fra under buen til over buen.
+        // Hopper den mot buen, spretter den av og snur, som mot veggene.
         if (showSquirrel) MascotLayer(
             ftp = ftp, watts = powerW, rpm = cadence, paused = paused, showLabel = showSquirrelLabel,
             figure = (44 * k).coerceIn(32f, 64f).dp,
+            // Buen (radius 128 ± tykkelse, med målbåndet ute på 141) er en hindring figuren spretter av
+            arc = no.spinapp.core.MascotArc(rInFrac = 121.0 / 300, rOutFrac = 145.0 / 300, startDeg = START.toDouble(), sweepDeg = SWEEP.toDouble()),
             modifier = Modifier.width(maxWidth).height(side),
         )
     }

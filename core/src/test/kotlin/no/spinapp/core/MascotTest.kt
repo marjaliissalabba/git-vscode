@@ -108,4 +108,31 @@ class MascotTest {
         kotlin.test.assertTrue(r.fps(MascotAnim.RUN, 116) > 25.0)
         assertEquals(20.0, r.fps(MascotAnim.IDLE, 0), 0.01)
     }
+
+    @Test
+    fun bouncesOffTheArcLikeAWall() {
+        // Boks 9 × 6 figurer, bue rundt midten (åpen nede) som i måleren. Buen gjelder i lufta.
+        val arc = MascotArc(rInFrac = 121.0 / 300, rOutFrac = 145.0 / 300, startDeg = 130.0, sweepDeg = 280.0)
+        val r = MascotRunner(kotlin.random.Random(7)).also { it.arc = arc }
+        val w = 9.0; val h = 6.0
+        val cx = 4.5; val cy = 3.0
+        var hits = 0; var lastFacing = r.facingRight
+        sim(r, 40.0, SquirrelMode.SPRINT, 115, w, h) {
+            val d = kotlin.math.hypot(it.x + 0.5 - cx, it.y + 0.5 - cy)
+            val deg = (Math.toDegrees(kotlin.math.atan2(-(it.y + 0.5 - cy), it.x + 0.5 - cx)) + 360) % 360
+            val inArc = (deg - 130 + 720) % 360 <= 280
+            if (inArc && it.y > 0.05) kotlin.test.assertFalse(d > h * 121 / 300 - 0.37 && d < h * 145 / 300 + 0.37, "inne i buen: d=$d, ${it.x}, ${it.y}")
+            if (it.facingRight != lastFacing) { hits++; lastFacing = it.facingRight }
+        }
+        kotlin.test.assertTrue(hits > 4, "snur: $hits")
+    }
+
+    @Test
+    fun frameCountsFromSheets() {
+        val r = MascotRunner().also { it.frameCounts = mapOf(MascotAnim.IDLE to 5); it.fpsScale = 0.5 }
+        val seen = mutableSetOf<Int>()
+        sim(r, 3.0, SquirrelMode.IDLE, 0) { seen += it.frame }
+        assertEquals((0..4).toSet(), seen)
+        assertEquals(10.0, r.fps(MascotAnim.IDLE, 0), 0.01)
+    }
 }

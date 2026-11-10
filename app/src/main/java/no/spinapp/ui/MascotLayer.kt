@@ -42,6 +42,7 @@ import kotlin.math.roundToInt
  * Figuren løper fritt i hele boksen den får (modifier bestemmer størrelsen): gulvet er bunnen,
  * veggene er sidene. Watt/FTP og rpm velger tilstand via [SquirrelDirector] (med reaksjonstid),
  * og [MascotRunner] beveger figuren. Pikslene skaleres med et helt tall så kantene blir skarpe.
+ * Hopper figuren mot [arc] (buen i måleren), spretter den av og snur.
  */
 @Composable
 fun MascotLayer(
@@ -50,6 +51,7 @@ fun MascotLayer(
     character: MascotCharacter = AppState.mascotCharacter,
     figure: Dp = 44.dp,
     showLabel: Boolean = false,
+    arc: no.spinapp.core.MascotArc? = null,
 ) {
     val context = LocalContext.current
     val sheets by produceState<Map<MascotAnim, ImageBitmap>>(emptyMap(), character) {
@@ -59,6 +61,11 @@ fun MascotLayer(
     }
     val director = remember { SquirrelDirector(AppState.squirrelThresholds) }
     val runner = remember { MascotRunner() }
+    runner.arc = arc
+    runner.fpsScale = character.fpsScale
+    // Bildene er kvadratiske: størrelsen er arkets høyde (32 i Pixel Adventure, 24 for reven)
+    runner.frameCounts = sheets.mapValues { (_, b) -> (b.width / b.height).coerceAtLeast(1) }
+    val cell = sheets[MascotAnim.IDLE]?.height ?: 32
     val w by rememberUpdatedState(watts)
     val r by rememberUpdatedState(rpm)
     val f by rememberUpdatedState(ftp)
@@ -84,10 +91,10 @@ fun MascotLayer(
 
     BoxWithConstraints(modifier) {
         val density = LocalDensity.current
-        // Heltallsskala: 32 px-bilder × n
+        // Heltallsskala: bildestørrelse × n
         val px = with(density) { figure.toPx() }
-        val scaleN = max(1, (px / 32f).roundToInt())
-        val fig = 32f * scaleN
+        val scaleN = max(1, (px / cell).roundToInt())
+        val fig = (cell * scaleN).toFloat()
         val bw = with(density) { maxWidth.toPx() }
         val bh = with(density) { maxHeight.toPx() }
         box[0] = (bw / fig).toDouble(); box[1] = (bh / fig).toDouble()
@@ -101,8 +108,8 @@ fun MascotLayer(
             scale(if (flip) -1f else 1f, 1f, pivot = Offset(left + fig / 2, top + fig / 2)) {
                 drawImage(
                     sheet,
-                    srcOffset = IntOffset(runner.frame.coerceIn(0, runner.anim.frames - 1) * 32, 0),
-                    srcSize = IntSize(32, 32),
+                    srcOffset = IntOffset(runner.frame.coerceIn(0, sheet.width / sheet.height - 1) * sheet.height, 0),
+                    srcSize = IntSize(sheet.height, sheet.height),
                     dstOffset = IntOffset(left.roundToInt(), top.roundToInt()),
                     dstSize = IntSize(fig.toInt(), fig.toInt()),
                     filterQuality = FilterQuality.None,
