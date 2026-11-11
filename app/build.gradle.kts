@@ -12,8 +12,8 @@ android {
         applicationId = "no.spinapp"
         minSdk = 26
         targetSdk = 35
-        versionCode = 36
-        versionName = "0.36"
+        versionCode = 37
+        versionName = "0.37"
 
         // Spotify-innlogging: må stemme med Redirect URI spinapp://spotify-callback
         manifestPlaceholders["redirectSchemeName"] = "spinapp"

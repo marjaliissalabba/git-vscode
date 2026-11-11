@@ -166,7 +166,8 @@ fun RideScreen(activity: MainActivity, workout: Workout, onFinished: (RideSummar
                 onFinished(summary)
                 return@LaunchedEffect
             }
-            if (state.segmentIndex != lastIndex) {
+            val segmentChanged = state.segmentIndex != lastIndex
+            if (segmentChanged) {
                 val prevSeg = workout.segments.getOrNull(lastIndex)
                 lastIndex = state.segmentIndex
                 coach.segmentChange()
@@ -186,11 +187,14 @@ fun RideScreen(activity: MainActivity, workout: Workout, onFinished: (RideSummar
             } else if (state.segmentRemainingSec in 1..3) {
                 coach.beep()
             }
-            // Stå opp / sitt ned midt i intervallet
+            // Stå opp / sitt ned midt i intervallet. Starter eller slutter ståperioden samtidig med
+            // et nytt intervall, spilles bare lyden for nytt intervall (den har forrang).
             val st = state.stand
-            if (st.standing && !wasStanding) coach.standUp()
-            else if (!st.standing && wasStanding) { coach.sitDown(); sitBannerUntil = state.elapsedSec + 3 }
-            else if (st.standInSec != null && st.standInSec!! in 1..3) coach.beep()
+            if (!segmentChanged) {
+                if (st.standing && !wasStanding) coach.standUp()
+                else if (!st.standing && wasStanding) { coach.sitDown(); sitBannerUntil = state.elapsedSec + 3 }
+                else if (st.standInSec != null && st.standInSec!! in 1..3 && state.segmentRemainingSec !in 1..3) coach.beep()
+            }
             wasStanding = st.standing
         }
     }
@@ -282,13 +286,21 @@ fun RideScreen(activity: MainActivity, workout: Workout, onFinished: (RideSummar
         ) {
             Column(Modifier.weight(1f)) {
                 // «Stå opp» vises i samme rute som tiden, i stedet for overskriften
-                if (!StandTitle(state.stand, showSit = state.elapsedSec < sitBannerUntil)) {
+                val secondsIn = seg?.let { it.durationSec - state.segmentRemainingSec } ?: 0
+                if (!StandTitle(state.stand, seg, secondsIn, showSit = state.elapsedSec < sitBannerUntil)) {
                     Text("Dette intervallet", color = C.n400, fontSize = 13.sp, fontFamily = Inter)
                 }
                 Text(formatTime(state.segmentRemainingSec), color = C.n100, fontSize = 38.sp, fontFamily = Inter, fontWeight = FontWeight.SemiBold, lineHeight = 42.sp)
                 val segFrac = seg?.let { 1f - state.segmentRemainingSec.toFloat() / it.durationSec.coerceAtLeast(1) } ?: 0f
                 Box(Modifier.fillMaxWidth(0.9f).height(4.dp).clip(RoundedCornerShape(2.dp)).background(C.n800)) {
                     Box(Modifier.fillMaxWidth(segFrac.coerceIn(0f, 1f)).height(4.dp).background(zoneColor))
+                }
+                // Senere ståperiode i dette intervallet: når og hvor lenge
+                if (seg != null && !state.stand.standing && state.stand.standInSec == null) {
+                    seg.stand.filter { it.fromSec > secondsIn }.minByOrNull { it.fromSec }?.let { w ->
+                        Text("⬆ Stå opp om ${formatTime(w.fromSec - secondsIn)} · i ${formatTime(w.lengthSec)}",
+                            color = Color(0xFFC39BD3), fontSize = 13.sp, fontFamily = Inter, modifier = Modifier.padding(top = 6.dp))
+                    }
                 }
                 if (session.inWarmup()) {
                     Text("Hopp over oppvarming", Modifier.clickable { if (session.skipWarmup()) refresh() }.padding(top = 8.dp, bottom = 2.dp),
@@ -304,6 +316,15 @@ fun RideScreen(activity: MainActivity, workout: Workout, onFinished: (RideSummar
                         Text(n.name, color = C.n100, fontSize = 16.sp, fontFamily = Inter, fontWeight = FontWeight.Medium, maxLines = 1)
                         Text("${formatTime(n.durationSec)} · ${n.powerLowPct}–${n.powerHighPct} %", color = Color(n.zone.argb), fontSize = 14.sp, fontFamily = Inter)
                         Text("${n.cadenceLow}–${n.cadenceHigh} rpm", color = C.n400, fontSize = 13.sp, fontFamily = Inter)
+                        // Ståperiode i neste intervall
+                        n.stand.firstOrNull()?.let { w ->
+                            val more = if (n.stand.size > 1) " (+${n.stand.size - 1})" else ""
+                            Text(
+                                if (w.fromSec == 0) "⬆ Start stående · ${formatTime(w.lengthSec)}$more"
+                                else "⬆ Stå opp etter ${formatTime(w.fromSec)} · ${formatTime(w.lengthSec)}$more",
+                                color = Color(0xFFC39BD3), fontSize = 13.sp, fontFamily = Inter, fontWeight = FontWeight.Medium,
+                            )
+                        }
                     } else {
                         Text("Siste intervall", color = C.n100, fontSize = 16.sp, fontFamily = Inter)
                     }
@@ -527,16 +548,6 @@ private class Coach(context: Context) {
     private val focus = android.media.AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
         .setAudioAttributes(attrs).build()
     private val worker = java.util.concurrent.Executors.newSingleThreadExecutor()
-    private val vibrator: Vibrator? = if (Build.VERSION.SDK_INT >= 31) {
-        (context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager)?.defaultVibrator
-    } else {
-        @Suppress("DEPRECATION")
-        context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
-    }
-
-    private fun vibrate(ms: Long) = runCatching {
-        vibrator?.vibrate(VibrationEffect.createOneShot(ms, VibrationEffect.DEFAULT_AMPLITUDE))
-    }
 
     /** Toner som (frekvens Hz, lengde ms, pause etter ms). Litt overtoner gjør at de skjærer gjennom musikk. */
     private fun play(vararg notes: Triple<Double, Int, Int>) {
@@ -582,19 +593,16 @@ private class Coach(context: Context) {
     /** Nytt intervall: bip-bip-BIIP. */
     fun segmentChange() {
         play(Triple(880.0, 110, 70), Triple(880.0, 110, 70), Triple(1320.0, 320, 0))
-        vibrate(400)
     }
 
     /** Stå opp: stigende. */
     fun standUp() {
         play(Triple(523.0, 150, 30), Triple(659.0, 150, 30), Triple(784.0, 150, 30), Triple(1047.0, 420, 0))
-        runCatching { vibrator?.vibrate(VibrationEffect.createWaveform(longArrayOf(0, 300, 150, 300, 150, 300), -1)) }
     }
 
     /** Sitt ned: synkende. */
     fun sitDown() {
         play(Triple(1047.0, 180, 30), Triple(784.0, 180, 30), Triple(523.0, 380, 0))
-        vibrate(600)
     }
 
     fun shutdown() {
@@ -607,10 +615,12 @@ private class Coach(context: Context) {
  * Returnerer false når det ikke er noe å vise.
  */
 @Composable
-private fun StandTitle(cue: no.spinapp.core.StandCue, showSit: Boolean): Boolean {
+private fun StandTitle(cue: no.spinapp.core.StandCue, seg: no.spinapp.core.Segment?, secondsIn: Int, showSit: Boolean): Boolean {
+    // Lengden på ståperioden som kommer (for «Stå opp om … s»)
+    val upcomingLen = seg?.stand?.filter { it.fromSec > secondsIn }?.minByOrNull { it.fromSec }?.lengthSec
     val (text, color) = when {
         cue.standing -> "⬆ STÅ OPP · ${formatTime(cue.standLeftSec ?: 0)}" to Color(0xFF8E44AD)
-        cue.standInSec != null -> "Stå opp om ${cue.standInSec} s" to Color(0xFF5B2C6F)
+        cue.standInSec != null -> "Stå opp om ${cue.standInSec} s" + (upcomingLen?.let { " · ${formatTime(it)}" } ?: "") to Color(0xFF5B2C6F)
         showSit -> "⬇ SITT NED" to Color(0xFF2E86DE)
         else -> return false
     }

@@ -31,8 +31,8 @@ Prøv kildene i denne rekkefølgen: Bluetooth, så ANT+, så kamera.
 
 - **Oppvarming** er ikke en del av øktene. Når du trykker Start, velger du 0, 5, 8, 10 eller 15 min oppvarming (appen husker valget).
 - **Lengde:** Velg f.eks. 40 min på en 50-minutters økt. Da blir alle intervallene 20 % kortere (avrundet til 5 s, minst 15 s).
-- **Stå opp:** Intervaller kan ha ståperioder. Intervallruta viser «Stå opp om …» før, «STÅ OPP» med nedtelling, og «SITT NED» etterpå, med vibrasjon. Ingen opplesning.
-- **Lyder:** nytt intervall = bip-bip-BIIP, stå opp = fire stigende toner, sitt ned = tre synkende toner. Lydene spilles på alarmvolumet og demper musikken kort, så de høres over sangen.
+- **Stå opp:** Intervaller kan ha ståperioder. Intervallruta viser når og hvor lenge («Stå opp om 1:20 · i 1:00»), så «STÅ OPP» med nedtelling og «SITT NED» etterpå. Starter neste intervall stående, står det i «Neste». Ingen opplesning og ingen vibrasjon (telefonen ligger på konsollet).
+- **Lyder:** nytt intervall = bip-bip-BIIP, stå opp = fire stigende toner, sitt ned = tre synkende toner. Faller stå opp sammen med et nytt intervall, spilles bare lyden for nytt intervall. Lydene spilles på alarmvolumet og demper musikken kort, så de høres over sangen.
 - **Neste intervall ⏭** og **Hopp over oppvarming** på øktskjermen.
 - **Liggende visning:** under økta kan telefonen snus. Da står måleren til venstre og intervall, mål og profil til høyre – fint for skjermdeling (Smart View / Cast skjerm) til TV.
 - **Øktbygger:** «+ Lag ny økt», eller «Lag egen versjon» av en ferdig økt. Endre navn, tid, % av FTP, kadens og ståperiode per intervall, kopier, flytt og slett. Egne økter lagres bare på telefonen.
