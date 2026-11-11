@@ -267,3 +267,23 @@ class VirtualSpeedTest {
         kotlin.test.assertTrue(km in 32.0..36.0, "$km")
     }
 }
+
+class ComplianceTest {
+    @Test
+    fun cooldownAndWarmupDoNotCount() {
+        val w = workout("t", "T", "") {
+            seg("Drag", 1.0, 95, 105, 85..95)
+            cooldown(1)
+        }
+        val s = RideSession(WorkoutComposer.compose(w, 0), 200)
+        // Drag: i mål hele minuttet
+        repeat(60) { s.tick(BikeSample(System.currentTimeMillis(), powerW = 200, cadenceRpm = 90, source = SourceType.SIMULATOR)) }
+        // Nedtrapping: helt feil (hard og rask) – skal ikke trekke ned
+        repeat(60) { s.tick(BikeSample(System.currentTimeMillis(), powerW = 300, cadenceRpm = 120, source = SourceType.SIMULATOR)) }
+        val sum = s.summary()
+        assertEquals(100, sum.powerCompliancePct)
+        assertEquals(100, sum.cadenceCompliancePct)
+        assertEquals(120, sum.durationSec)
+        kotlin.test.assertTrue(w.segments.last().isCooldown)
+    }
+}

@@ -40,7 +40,12 @@ data class Segment(
     val isWarmup: Boolean = false,
     /** Perioder i intervallet der man skal stå opp (sekunder fra intervallets start). */
     val stand: List<StandWindow> = emptyList(),
+    /** Nedtrapping på slutten. */
+    val isCooldown: Boolean = false,
 ) {
+    /** Teller med i treffprosenten (ikke oppvarming eller nedtrapping). */
+    val countsForCompliance get() = !isWarmup && !isCooldown && !name.startsWith("Nedtrapping")
+
     val midPct get() = (powerLowPct + powerHighPct) / 2.0
     val midCadence get() = (cadenceLow + cadenceHigh) / 2
     val zone get() = Zone.forPct(midPct)
@@ -109,7 +114,7 @@ class WorkoutBuilder {
     }
 
     fun cooldown(min: Int = 5) {
-        seg("Nedtrapping", min.toDouble(), 40, 55, 75..85)
+        list += Segment("Nedtrapping", min * 60, 40, 55, 75, 85, isCooldown = true)
     }
 
     fun build() = list.toList()

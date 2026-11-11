@@ -295,13 +295,6 @@ fun RideScreen(activity: MainActivity, workout: Workout, onFinished: (RideSummar
                 Box(Modifier.fillMaxWidth(0.9f).height(4.dp).clip(RoundedCornerShape(2.dp)).background(C.n800)) {
                     Box(Modifier.fillMaxWidth(segFrac.coerceIn(0f, 1f)).height(4.dp).background(zoneColor))
                 }
-                // Senere ståperiode i dette intervallet: når og hvor lenge
-                if (seg != null && !state.stand.standing && state.stand.standInSec == null) {
-                    seg.stand.filter { it.fromSec > secondsIn }.minByOrNull { it.fromSec }?.let { w ->
-                        Text("⬆ Stå opp om ${formatTime(w.fromSec - secondsIn)} · i ${formatTime(w.lengthSec)}",
-                            color = Color(0xFFC39BD3), fontSize = 13.sp, fontFamily = Inter, modifier = Modifier.padding(top = 6.dp))
-                    }
-                }
                 if (session.inWarmup()) {
                     Text("Hopp over oppvarming", Modifier.clickable { if (session.skipWarmup()) refresh() }.padding(top = 8.dp, bottom = 2.dp),
                         color = C.accent300, fontSize = 14.sp, fontFamily = Inter)
@@ -334,14 +327,20 @@ fun RideScreen(activity: MainActivity, workout: Workout, onFinished: (RideSummar
 
     }
     val targetsRow: @Composable () -> Unit = { 
-        // 5. Mål + status
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text(if (seg != null) "Mål ${seg.powerLowPct}–${seg.powerHighPct} %" else "–", color = C.n100, fontSize = 24.sp, fontFamily = Inter, fontWeight = FontWeight.Medium)
-                if (seg != null) Text("${state.targetPowerLow}–${state.targetPowerHigh} W", color = C.n400, fontSize = 14.sp, fontFamily = Inter)
-                if (seg != null) Text("${seg.cadenceLow}–${seg.cadenceHigh} rpm", color = C.n400, fontSize = 14.sp, fontFamily = Inter)
-            }
-            StatusPill(state)
+        // 5. Målene på én linje: Mål % · watt · rpm
+        if (seg != null) {
+            Text(
+                androidx.compose.ui.text.buildAnnotatedString {
+                    withStyle(androidx.compose.ui.text.SpanStyle(color = C.n100, fontSize = 20.sp, fontWeight = FontWeight.Medium)) {
+                        append("Mål ${seg.powerLowPct}–${seg.powerHighPct} %")
+                    }
+                    withStyle(androidx.compose.ui.text.SpanStyle(color = C.n300, fontSize = 16.sp)) {
+                        append(" · ${state.targetPowerLow}–${state.targetPowerHigh} W · ${seg.cadenceLow}–${seg.cadenceHigh} rpm")
+                    }
+                },
+                fontFamily = Inter, maxLines = 1, softWrap = false,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+            )
         }
 
     }
@@ -381,7 +380,10 @@ fun RideScreen(activity: MainActivity, workout: Workout, onFinished: (RideSummar
                 { paused = !paused }, Modifier.weight(1f), big = true,
                 icon = { if (paused) Icon(Ico.Play, C.n100, 18.dp) else Text("❚❚", color = C.n100, fontSize = 14.sp) },
             )
-            ControlButton("⏭") { if (session.skipToNext()) refresh() }
+            ControlButton("⏭") {
+                if (session.skipToNext()) refresh()
+                else { pausedBeforeEnd = paused; paused = true; endSheet = true } // siste intervall: avslutte?
+            }
         }
     }
     Column(
@@ -460,24 +462,6 @@ private fun ControlButton(symbol: String, onClick: () -> Unit) {
         Modifier.size(56.dp).clip(RoundedCornerShape(8.dp)).border(1.dp, C.n700, RoundedCornerShape(8.dp)).clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) { Text(symbol, color = C.n200, fontSize = 18.sp) }
-}
-
-/** «I mål ✓» / «Øk ↑ +18 W» / «Senk ↓ −12 W». */
-@Composable
-private fun StatusPill(state: RideState) {
-    val p = state.powerW
-    val (text, color) = when (state.powerStatus) {
-        TargetStatus.IN_RANGE -> "I mål ✓" to C.good
-        TargetStatus.LOW -> "Øk ↑ +${state.targetPowerLow - (p ?: 0)} W" to C.bad
-        TargetStatus.HIGH -> "Senk ↓ −${(p ?: 0) - state.targetPowerHigh} W" to C.warn
-        TargetStatus.NO_DATA -> "Ingen data" to C.n500
-    }
-    Text(
-        text,
-        Modifier.clip(RoundedCornerShape(50)).background(color.copy(alpha = 0.16f)).border(1.dp, color, RoundedCornerShape(50))
-            .padding(horizontal = 14.dp, vertical = 8.dp),
-        color = color, fontSize = 16.sp, fontFamily = Inter, fontWeight = FontWeight.Medium,
-    )
 }
 
 /** Profil under økta: gjennomførte intervaller dempet til 35 %, hvit avspillingslinje. */

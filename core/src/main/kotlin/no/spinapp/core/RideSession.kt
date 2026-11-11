@@ -85,6 +85,8 @@ class RideSession(val workout: Workout, val ftp: Int) {
     private var powerHits = 0
     private var cadenceHits = 0
     private var ridingSeconds = 0
+    /** Sekunder tråkket i intervallene som teller (ikke oppvarming/nedtrapping). */
+    private var targetSeconds = 0
     private val ftpTestPower = ArrayList<Int>()
     var elapsedSec = 0
         private set
@@ -140,8 +142,11 @@ class RideSession(val workout: Workout, val ftp: Int) {
             ridingSeconds++
             val z = Zone.forPower(p, ftp)
             zoneSeconds[z] = (zoneSeconds[z] ?: 0) + 1
-            if (before.powerStatus == TargetStatus.IN_RANGE) powerHits++
-            if (before.cadenceStatus == TargetStatus.IN_RANGE) cadenceHits++
+            if (seg.countsForCompliance) {
+                targetSeconds++
+                if (before.powerStatus == TargetStatus.IN_RANGE) powerHits++
+                if (before.cadenceStatus == TargetStatus.IN_RANGE) cadenceHits++
+            }
         }
         if (seg.isFtpTest) ftpTestPower += p
         elapsedSec++
@@ -209,8 +214,8 @@ class RideSession(val workout: Workout, val ftp: Int) {
             maxCadence = cadenceLog.maxOrNull() ?: 0,
             kilojoules = (powerLog.sumOf { it.toLong() } / 1000.0).roundToInt(),
             tss = tss,
-            powerCompliancePct = if (ridingSeconds == 0) 0 else powerHits * 100 / ridingSeconds,
-            cadenceCompliancePct = if (ridingSeconds == 0) 0 else cadenceHits * 100 / ridingSeconds,
+            powerCompliancePct = if (targetSeconds == 0) 0 else powerHits * 100 / targetSeconds,
+            cadenceCompliancePct = if (targetSeconds == 0) 0 else cadenceHits * 100 / targetSeconds,
             secondsInZone = Zone.entries.associateWith { zoneSeconds[it] ?: 0 },
             best20MinPower = best20,
             ftpTestResult = ftpTest,

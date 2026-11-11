@@ -64,7 +64,8 @@ fun SummaryScreen(summary: RideSummary, onDone: () -> Unit) {
             else StatPair("FTP", "$ftp W", "", "")
             Spacer(Modifier.height(4.dp))
             Muted("Fart og distanse er virtuelle (flat vei, regnet fra watt" + (if (weight > 0) " og vekten din)." else ", 75 kg – oppgi vekt under Profil).") +
-                " Energi er regnet fra arbeidet (${summary.kilojoules} kJ).", 12, C.n500)
+                " Energi er regnet fra arbeidet (${summary.kilojoules} kJ)." +
+                " Tid i målsone gjelder bare intervallene du kjørte, ikke oppvarming og nedtrapping.", 12, C.n500)
         }
 
         // Intensitet: tid i hver sone

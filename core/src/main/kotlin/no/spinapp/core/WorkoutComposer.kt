@@ -108,6 +108,7 @@ object WorkoutJson {
                     .put("pl", s.powerLowPct).put("ph", s.powerHighPct)
                     .put("cl", s.cadenceLow).put("ch", s.cadenceHigh)
                     .put("ftp", s.isFtpTest)
+                    .put("cd", s.isCooldown)
                     .put("st", JSONArray().apply { s.stand.forEach { put(JSONArray().put(it.fromSec).put(it.toSec)) } }))
             }
         })
@@ -125,6 +126,7 @@ object WorkoutJson {
                 cadenceLow = o.getInt("cl"),
                 cadenceHigh = o.getInt("ch"),
                 isFtpTest = o.optBoolean("ftp", false),
+                isCooldown = o.optBoolean("cd", false),
                 stand = (0 until st.length()).map { k ->
                     val p = st.getJSONArray(k)
                     StandWindow(p.getInt(0), p.getInt(1))
