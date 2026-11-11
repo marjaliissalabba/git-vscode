@@ -252,3 +252,18 @@ class TrainingPlansTest {
         assertEquals(39, WorkoutLibrary.ronnestad3015.segments.count { it.durationSec == 30 && it.powerLowPct >= 118 })
     }
 }
+
+class VirtualSpeedTest {
+    @Test
+    fun speedFromPower() {
+        // 200 W, 75 kg rytter: ca. 33–35 km/t på flat vei
+        val kmh = VirtualSpeed.speedMs(200.0, 75.0) * 3.6
+        kotlin.test.assertTrue(kmh in 32.0..36.0, "$kmh")
+        // Tyngre rytter går litt saktere med samme watt
+        kotlin.test.assertTrue(VirtualSpeed.speedMs(200.0, 100.0) < VirtualSpeed.speedMs(200.0, 60.0))
+        assertEquals(0.0, VirtualSpeed.speedMs(0.0, 75.0), 1e-9)
+        // 1 time på 200 W ≈ 33–36 km
+        val km = VirtualSpeed.distanceKm(List(3600) { 200 }, 75.0)
+        kotlin.test.assertTrue(km in 32.0..36.0, "$km")
+    }
+}

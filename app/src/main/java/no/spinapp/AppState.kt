@@ -55,6 +55,14 @@ object AppState {
         get() = prefs.getInt("sessionsPerWeek", 3)
         set(v) = prefs.edit().putInt("sessionsPerWeek", v.coerceIn(1, 6)).apply()
 
+    /** Kroppsvekt i kg (0 = ikke oppgitt). Brukes til W/kg og virtuell fart/distanse, ikke til FTP. */
+    var weightKg: Int
+        get() = prefs.getInt("weightKg", 0)
+        set(v) = prefs.edit().putInt("weightKg", v.coerceIn(0, 250)).apply()
+
+    /** Vekt for virtuell fart: oppgitt vekt, ellers 75 kg. */
+    val riderKg: Double get() = weightKg.takeIf { it > 0 }?.toDouble() ?: 75.0
+
     /** Treningsplanen som følges (id i TrainingPlans), eller null. */
     var activePlanId: String?
         get() = prefs.getString("activePlan", null)

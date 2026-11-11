@@ -716,6 +716,20 @@ private fun ProfilTab(
             Text("Usikker? Ta FTP-test (20 min)  ", color = C.accent200, fontSize = 14.sp, fontFamily = Inter)
             Icon(Ico.Arrow, C.accent200, 14.dp)
         }
+        // Vekt (valgfritt): gir W/kg og virtuell fart. FTP er i watt og trenger ikke vekt.
+        var weight by remember { mutableIntStateOf(AppState.weightKg) }
+        Row(Modifier.padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Muted("Vekt (valgfritt)", 12)
+                Text(
+                    if (weight > 0) "$weight kg · ${"%.1f".format(java.util.Locale("nb", "NO"), ftp.toDouble() / weight)} W/kg" else "Ikke oppgitt",
+                    color = C.n100, fontSize = 16.sp, fontFamily = Inter,
+                )
+            }
+            StepButton(false, { weight = if (weight <= 30) 0 else weight - 1; AppState.weightKg = weight }, 36.dp, enabled = weight > 0)
+            Spacer(Modifier.width(8.dp))
+            StepButton(true, { weight = if (weight == 0) 75 else weight + 1; AppState.weightKg = weight }, 36.dp)
+        }
         Spacer(Modifier.height(6.dp))
         Zone.entries.forEachIndexed { i, z ->
             val lo = if (i == 0) 0 else ftp * Zone.entries[i - 1].highPct / 100 + 1

@@ -160,7 +160,7 @@ fun RideScreen(activity: MainActivity, workout: Workout, onFinished: (RideSummar
             state = session.tick(source?.freshSample())
             AppState.currentTarget.value = state.segment
             if (state.finished) {
-                val summary = session.summary()
+                val summary = session.summary(AppState.riderKg)
                 saveRide(summary)
                 if (spotifyOn) no.spinapp.SpotifyControl.pause(context)
                 onFinished(summary)
@@ -429,7 +429,7 @@ fun RideScreen(activity: MainActivity, workout: Workout, onFinished: (RideSummar
                 AccentButton("Avslutt og lagre", {
                     endSheet = false
                     if (spotifyOn && musicPlaying) no.spinapp.SpotifyControl.pause(context)
-                    val summary = if (session.elapsedSec > 60) session.summary() else null
+                    val summary = if (session.elapsedSec > 60) session.summary(AppState.riderKg) else null
                     summary?.let { saveRide(it) }
                     onFinished(summary)
                 }, Modifier.fillMaxWidth(), big = true)

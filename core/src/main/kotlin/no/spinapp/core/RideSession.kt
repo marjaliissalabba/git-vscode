@@ -31,6 +31,7 @@ data class RideSummary(
     val normalizedPower: Int,
     val maxPower: Int,
     val avgCadence: Int,
+    val maxCadence: Int,
     val kilojoules: Int,
     val tss: Int,
     val powerCompliancePct: Int,
@@ -41,7 +42,37 @@ data class RideSummary(
     val suggestedFtp: Int?,
     /** Snitt-watt per 15 s, til grafen i loggen (ca. 240 tall per time). */
     val powerTrace: List<Int> = emptyList(),
-)
+    /** Virtuell distanse på flat vei (se [VirtualSpeed]), km. */
+    val distanceKm: Double = 0.0,
+) {
+    /** Forbrent energi: arbeidet (kJ) med ca. 24 % virkningsgrad gir omtrent like mange kcal som kJ. */
+    val kcal get() = (kilojoules / (4.184 * 0.24)).roundToInt()
+    val avgSpeedKmh get() = if (durationSec > 0) distanceKm / (durationSec / 3600.0) else 0.0
+}
+
+/**
+ * Virtuell fart på flat vei ut fra watt, som de fleste innendørsapper: luftmotstand
+ * (CdA 0,32 m², luft 1,225 kg/m³) og rullemotstand (Crr 0,005) for rytter + 9 kg sykkel.
+ */
+object VirtualSpeed {
+    fun speedMs(watts: Double, riderKg: Double): Double {
+        if (watts <= 0) return 0.0
+        val m = riderKg + 9.0
+        val aero = 0.5 * 1.225 * 0.32
+        val roll = 0.005 * m * 9.81
+        // P = (aero·v² + roll)·v, løses med halvering
+        var lo = 0.0; var hi = 40.0
+        repeat(50) {
+            val v = (lo + hi) / 2
+            if ((aero * v * v + roll) * v > watts) hi = v else lo = v
+        }
+        return (lo + hi) / 2
+    }
+
+    /** Distanse i km for watt målt én gang i sekundet. */
+    fun distanceKm(powerPerSecond: List<Int>, riderKg: Double): Double =
+        powerPerSecond.sumOf { speedMs(it.toDouble(), riderKg) } / 1000.0
+}
 
 /**
  * Følger en økt sekund for sekund og samler statistikk.
@@ -151,7 +182,8 @@ class RideSession(val workout: Workout, val ftp: Int) {
         return true
     }
 
-    fun summary(): RideSummary {
+    /** [riderKg] brukes bare til virtuell distanse og fart (ikke til FTP eller watt). */
+    fun summary(riderKg: Double = 75.0): RideSummary {
         val n = powerLog.size
         val avgP = if (n == 0) 0 else powerLog.average().roundToInt()
         val riding = cadenceLog.filter { it > 0 }
@@ -174,6 +206,7 @@ class RideSession(val workout: Workout, val ftp: Int) {
             normalizedPower = np,
             maxPower = powerLog.maxOrNull() ?: 0,
             avgCadence = avgC,
+            maxCadence = cadenceLog.maxOrNull() ?: 0,
             kilojoules = (powerLog.sumOf { it.toLong() } / 1000.0).roundToInt(),
             tss = tss,
             powerCompliancePct = if (ridingSeconds == 0) 0 else powerHits * 100 / ridingSeconds,
@@ -183,6 +216,7 @@ class RideSession(val workout: Workout, val ftp: Int) {
             ftpTestResult = ftpTest,
             suggestedFtp = suggested,
             powerTrace = powerLog.chunked(15) { it.average().roundToInt() },
+            distanceKm = VirtualSpeed.distanceKm(powerLog, riderKg),
         )
     }
 
