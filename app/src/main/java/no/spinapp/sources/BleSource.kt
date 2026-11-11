@@ -194,7 +194,18 @@ data class FoundDevice(
     val name: String?,
     val rssi: Int,
     val services: Set<String>,
-)
+    /** Utjevnet signalstyrke (dBm), så lista ikke hopper. */
+    val smoothRssi: Double = rssi.toDouble(),
+    val lastSeenMs: Long = System.currentTimeMillis(),
+) {
+    /** Treningsutstyr: sender watt/sykkel/kadens/puls, eller har et navn som ligner en sykkel. */
+    val isFitness: Boolean
+        get() = services.isNotEmpty() || name?.contains(FITNESS_NAME) == true
+
+    companion object {
+        private val FITNESS_NAME = Regex("(?i)stages|bike|body ?bike|keiser|schwinn|wattbike|kickr|tacx|elite|trainer|cycle|spin|ic\\d|m3i|echelon|peloton")
+    }
+}
 
 /** Søker etter Bluetooth-enheter i nærheten. */
 @SuppressLint("MissingPermission")
@@ -212,8 +223,16 @@ class BleScanner(private val context: Context) {
                 if (BleUuids.HEART_RATE_SERVICE in uuids) add("Puls")
             }
             val name = result.device.name ?: result.scanRecord?.deviceName
-            val d = FoundDevice(result.device.address, name, result.rssi, tags)
-            devices.value = devices.value + (d.address to d)
+            val now = System.currentTimeMillis()
+            val old = devices.value[result.device.address]
+            // Signalstyrken svinger mye; utjevning gjør «nærmest» mer pålitelig
+            val smooth = old?.let { it.smoothRssi + (result.rssi - it.smoothRssi) * 0.3 } ?: result.rssi.toDouble()
+            val d = FoundDevice(
+                result.device.address, name ?: old?.name, result.rssi,
+                tags.ifEmpty { old?.services.orEmpty() }, smooth, now,
+            )
+            // Glem enheter som ikke er sett på 15 s
+            devices.value = devices.value.filterValues { now - it.lastSeenMs < 15_000 } + (d.address to d)
         }
 
         override fun onScanFailed(errorCode: Int) {

@@ -8,6 +8,10 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.material3.TextButton
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -84,47 +88,130 @@ fun BleSetupScreen(onDone: () -> Unit) {
     }
     DisposableEffect(Unit) { onDispose { scanner.stop() } }
 
+    // Lista oppdateres hvert 2. sekund (eller fryses), sortert etter utjevnet signal, så den ikke hopper
+    var showAll by remember { mutableStateOf(false) }
+    var frozen by remember { mutableStateOf(false) }
+    var shown by remember { mutableStateOf(listOf<no.spinapp.sources.FoundDevice>()) }
+    var hidden by remember { mutableStateOf(0) }
+    var testing by remember { mutableStateOf<no.spinapp.sources.FoundDevice?>(null) }
+    val last = remember { AppState.bleAddress }
+    LaunchedEffect(showAll, frozen) {
+        while (true) {
+            if (!frozen) {
+                val now = System.currentTimeMillis()
+                val all = scanner.devices.value.values.filter { now - it.lastSeenMs < 10_000 }
+                val list = if (showAll) all else all.filter { it.isFitness }
+                hidden = all.size - list.size
+                shown = list.sortedByDescending { it.smoothRssi }
+            } else {
+                // Frosset: bare oppdater signalet for enhetene som vises
+                val cur = scanner.devices.value
+                shown = shown.map { cur[it.address] ?: it }
+            }
+            kotlinx.coroutines.delay(2000)
+        }
+    }
+    val nearest = shown.maxByOrNull { it.smoothRssi }?.takeIf { top ->
+        val second = shown.filter { it.address != top.address }.maxOfOrNull { it.smoothRssi }
+        second == null || top.smoothRssi - second >= 8
+    }
+
     Column(
-        Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)
+        Modifier.fillMaxSize().background(C.bg)
             .statusBarsPadding().navigationBarsPadding().padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Text("Bluetooth-enheter", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+        Text("Finn sykkelen din", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = C.n100, fontFamily = Inter)
         Text(
-            "Tråkk på sykkelen så kraftmåleren våkner. Velg enheten merket «Watt» eller «Sykkel». " +
-                "Stages heter ofte «Stages …». Sterkest signal (nærmest 0 dBm) er som regel sykkelen din.",
-            color = Color.Gray, fontSize = 14.sp,
+            "1. Tråkk, så sykkelen våkner.\n" +
+                "2. Hold telefonen helt inntil konsollet noen sekunder. Den som merkes «Nærmest deg» er som regel din.\n" +
+                "3. Trykk på den og tråkk: følger tallene deg, er det riktig sykkel.",
+            color = C.n300, fontSize = 14.sp, fontFamily = Inter, lineHeight = 20.sp,
         )
         if (!granted) {
             Button(onClick = { launcher.launch(blePermissions()) }) { Text("Gi tilgang til Bluetooth") }
         }
         error?.let { Text(it, color = Color(0xFFE74C3C)) }
-        val sorted = devices.values.sortedWith(
-            compareByDescending<no.spinapp.sources.FoundDevice> { it.services.isNotEmpty() }.thenByDescending { it.rssi }
-        )
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Pill(if (frozen) "▶ Oppdater lista" else "⏸ Frys lista", frozen) { frozen = !frozen }
+            Pill(if (showAll) "Bare sykler" else "Vis alle" + if (hidden > 0) " ($hidden til)" else "", showAll) { showAll = !showAll }
+        }
+        if (shown.isEmpty()) Muted("Søker … Tråkk på sykkelen.", 14, C.n400)
         LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            items(sorted, key = { it.address }) { d ->
-                Card(
-                    Modifier.fillMaxWidth().clickable {
-                        AppState.bleAddress = d.address
-                        AppState.bleName = d.name ?: d.address
-                        AppState.sourceType = SourceType.BLUETOOTH
-                        activity.resetSource()
-                        onDone()
-                    }
+            items(shown, key = { it.address }) { d ->
+                val isNearest = d.address == nearest?.address
+                Column(
+                    Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+                        .background(if (isNearest) C.accentTint else C.surface)
+                        .border(1.dp, if (isNearest) C.accent else C.n800, RoundedCornerShape(12.dp))
+                        .clickable { testing = d }.padding(12.dp),
                 ) {
-                    Column(Modifier.padding(12.dp)) {
-                        Text(d.name ?: "(uten navn)", fontWeight = FontWeight.SemiBold)
-                        Text("${d.address} · ${d.rssi} dBm", color = Color.Gray, fontSize = 13.sp)
-                        if (d.services.isNotEmpty()) {
-                            Text(d.services.joinToString(" · "), color = Color(0xFF2ECC71), fontSize = 13.sp)
-                        }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(d.name ?: "Ukjent · …${d.address.takeLast(5)}", Modifier.weight(1f), color = C.n100,
+                            fontWeight = FontWeight.SemiBold, fontSize = 16.sp, fontFamily = Inter)
+                        if (isNearest) Text("Nærmest deg", color = C.accent200, fontSize = 13.sp, fontFamily = Inter, fontWeight = FontWeight.SemiBold)
+                        else if (d.address == last) Text("Valgt sist", color = C.n400, fontSize = 13.sp, fontFamily = Inter)
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 6.dp)) {
+                        SignalBars(d.smoothRssi)
+                        Text("  ${d.smoothRssi.toInt()} dBm", color = C.n400, fontSize = 13.sp, fontFamily = Inter)
+                        if (d.services.isNotEmpty()) Text("  ·  " + d.services.joinToString(" · "), color = C.good, fontSize = 13.sp, fontFamily = Inter)
                     }
                 }
             }
         }
         OutlinedButton(onClick = onDone) { Text("Tilbake") }
     }
+
+    testing?.let { d -> BleTestDialog(d, onUse = {
+        AppState.bleAddress = d.address
+        AppState.bleName = d.name ?: d.address
+        AppState.sourceType = SourceType.BLUETOOTH
+        testing = null
+        activity.resetSource()
+        onDone()
+    }, onCancel = { testing = null }) }
+}
+
+/** Fire streker for signalstyrke (−95 dBm = ingen, −45 dBm = full). */
+@Composable
+private fun SignalBars(rssi: Double) {
+    val level = ((rssi + 95) / 12.5).toInt().coerceIn(0, 4)
+    Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+        for (i in 1..4) {
+            Box(Modifier.width(4.dp).height((4 + i * 3).dp).clip(RoundedCornerShape(1.dp)).background(if (i <= level) C.good else C.n700))
+        }
+    }
+}
+
+/** Kobler til enheten og viser watt og rpm live, så du kan sjekke at det er din sykkel før du lagrer. */
+@Composable
+private fun BleTestDialog(d: no.spinapp.sources.FoundDevice, onUse: () -> Unit, onCancel: () -> Unit) {
+    val context = LocalContext.current
+    val source = remember(d.address) { no.spinapp.sources.BleSource(context.applicationContext, d.address) }
+    DisposableEffect(d.address) {
+        source.start()
+        onDispose { source.stop() }
+    }
+    val status by source.status.collectAsState()
+    val sample by source.latest.collectAsState()
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onCancel,
+        containerColor = C.surface,
+        title = { Text(d.name ?: "Ukjent · …${d.address.takeLast(5)}", color = C.n100, fontFamily = Inter) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("Tråkk litt og varier farten. Følger tallene deg, er dette sykkelen din.", color = C.n300, fontSize = 14.sp, fontFamily = Inter)
+                Text(status, color = C.n400, fontSize = 13.sp, fontFamily = Inter)
+                Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+                    Text("${sample?.powerW ?: "–"} W", color = C.n100, fontSize = 28.sp, fontFamily = Inter, fontWeight = FontWeight.Medium)
+                    Text("${sample?.cadenceRpm ?: "–"} rpm", color = C.n100, fontSize = 28.sp, fontFamily = Inter, fontWeight = FontWeight.Medium)
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = { source.stop(); onUse() }) { Text("Bruk denne", color = C.accent200) } },
+        dismissButton = { TextButton(onClick = onCancel) { Text("Prøv en annen", color = C.n400) } },
+    )
 }
 
 @Composable
