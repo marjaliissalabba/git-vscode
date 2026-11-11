@@ -237,6 +237,8 @@ fun RideScreen(activity: MainActivity, workout: Workout, onFinished: (RideSummar
                     maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
             }
             Spacer(Modifier.width(8.dp))
+            // Tid igjen av økta
+            Text(formatTime(state.totalRemainingSec), color = C.n100, fontSize = 24.sp, fontFamily = Inter, fontWeight = FontWeight.Medium)
             Text("×  Avslutt", Modifier.clip(RoundedCornerShape(8.dp)).clickable {
                 pausedBeforeEnd = paused; paused = true; endSheet = true
             }.padding(horizontal = 10.dp, vertical = 12.dp), color = C.n400, fontSize = 15.sp, fontFamily = Inter)
@@ -271,24 +273,6 @@ fun RideScreen(activity: MainActivity, workout: Workout, onFinished: (RideSummar
         }
 
     }
-    val titleRow: @Composable () -> Unit = { 
-        // 3. Tittelrad: intervallets navn, eller «STÅ OPP» / «SITT NED» når det gjelder
-        Row(verticalAlignment = Alignment.Bottom) {
-            Column(Modifier.weight(1f)) {
-                Text("Intervall ${(state.segmentIndex + 1).coerceAtMost(workout.segments.size)} av ${workout.segments.size}",
-                    color = C.n400, fontSize = 14.sp, fontFamily = Inter, maxLines = 1)
-                if (!StandTitle(state.stand, showSit = state.elapsedSec < sitBannerUntil)) {
-                    Text(seg?.name ?: "Ferdig", color = zoneColor, fontSize = 30.sp, fontFamily = Inter, fontWeight = FontWeight.Medium,
-                        maxLines = 1, lineHeight = 34.sp)
-                }
-            }
-            Column(horizontalAlignment = Alignment.End) {
-                Text("Igjen av økta", color = C.n400, fontSize = 14.sp, fontFamily = Inter)
-                Text(formatTime(state.totalRemainingSec), color = C.n100, fontSize = 30.sp, fontFamily = Inter, fontWeight = FontWeight.Medium, lineHeight = 34.sp)
-            }
-        }
-
-    }
     val intervalCard: @Composable () -> Unit = { 
         // 4. Intervallkort
         Row(
@@ -297,8 +281,11 @@ fun RideScreen(activity: MainActivity, workout: Workout, onFinished: (RideSummar
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(Modifier.weight(1f)) {
-                Text("Dette intervallet", color = C.n400, fontSize = 13.sp, fontFamily = Inter)
-                Text(formatTime(state.segmentRemainingSec), color = C.n100, fontSize = 48.sp, fontFamily = Inter, fontWeight = FontWeight.SemiBold, lineHeight = 52.sp)
+                // «Stå opp» vises i samme rute som tiden, i stedet for overskriften
+                if (!StandTitle(state.stand, showSit = state.elapsedSec < sitBannerUntil)) {
+                    Text("Dette intervallet", color = C.n400, fontSize = 13.sp, fontFamily = Inter)
+                }
+                Text(formatTime(state.segmentRemainingSec), color = C.n100, fontSize = 38.sp, fontFamily = Inter, fontWeight = FontWeight.SemiBold, lineHeight = 42.sp)
                 val segFrac = seg?.let { 1f - state.segmentRemainingSec.toFloat() / it.durationSec.coerceAtLeast(1) } ?: 0f
                 Box(Modifier.fillMaxWidth(0.9f).height(4.dp).clip(RoundedCornerShape(2.dp)).background(C.n800)) {
                     Box(Modifier.fillMaxWidth(segFrac.coerceIn(0f, 1f)).height(4.dp).background(zoneColor))
@@ -397,7 +384,6 @@ fun RideScreen(activity: MainActivity, workout: Workout, onFinished: (RideSummar
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     musicRow()
-                    titleRow()
                     intervalCard()
                     targetsRow()
                     profileView()
@@ -406,7 +392,6 @@ fun RideScreen(activity: MainActivity, workout: Workout, onFinished: (RideSummar
         } else {
             statusRow()
             musicRow()
-            titleRow()
             intervalCard()
             targetsRow()
             gaugeView(Modifier.fillMaxWidth().weight(1f))
@@ -524,8 +509,24 @@ fun WorkoutProfile(workout: Workout, ftp: Int, progressSec: Int?, modifier: Modi
 }
 
 /** Pip og vibrasjon ved intervallbytte og stå opp/sitt ned. Ingen opplesning. */
+/**
+ * Lyd og vibrasjon. Lydene lages som toner (ikke opplesning) og spilles på alarmvolumet,
+ * så de høres over musikken; musikken dempes kort mens de spilles.
+ * - Nytt intervall: bip-bip-BIIP (to korte og én lang, høyere)
+ * - Stå opp: stigende fire toner
+ * - Sitt ned: synkende tre toner
+ * - Nedtelling: ett kort bip
+ */
 private class Coach(context: Context) {
-    private val tone = runCatching { ToneGenerator(AudioManager.STREAM_MUSIC, 80) }.getOrNull()
+    private val am = context.getSystemService(AudioManager::class.java)
+    private val rate = 44100
+    private val attrs = android.media.AudioAttributes.Builder()
+        .setUsage(android.media.AudioAttributes.USAGE_ALARM)
+        .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
+        .build()
+    private val focus = android.media.AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
+        .setAudioAttributes(attrs).build()
+    private val worker = java.util.concurrent.Executors.newSingleThreadExecutor()
     private val vibrator: Vibrator? = if (Build.VERSION.SDK_INT >= 31) {
         (context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager)?.defaultVibrator
     } else {
@@ -537,35 +538,73 @@ private class Coach(context: Context) {
         vibrator?.vibrate(VibrationEffect.createOneShot(ms, VibrationEffect.DEFAULT_AMPLITUDE))
     }
 
-    fun beep() {
-        tone?.startTone(ToneGenerator.TONE_PROP_BEEP, 120)
-    }
-
-    fun segmentChange() {
-        tone?.startTone(ToneGenerator.TONE_PROP_BEEP2, 300)
-        vibrate(400)
-    }
-
-    fun standUp() {
-        tone?.startTone(ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD, 500)
-        runCatching {
-            vibrator?.vibrate(VibrationEffect.createWaveform(longArrayOf(0, 300, 150, 300, 150, 300), -1))
+    /** Toner som (frekvens Hz, lengde ms, pause etter ms). Litt overtoner gjør at de skjærer gjennom musikk. */
+    private fun play(vararg notes: Triple<Double, Int, Int>) {
+        worker.execute {
+            runCatching {
+                val total = notes.sumOf { it.second * rate / 1000 + it.third * rate / 1000 }
+                val buf = ShortArray(total)
+                var pos = 0
+                for ((f, ms, gap) in notes) {
+                    val n = ms * rate / 1000
+                    val edge = rate * 6 / 1000
+                    for (i in 0 until n) {
+                        val t = i.toDouble() / rate
+                        val env = minOf(1.0, i.toDouble() / edge, (n - i).toDouble() / edge)
+                        val w = Math.sin(2 * Math.PI * f * t) + 0.35 * Math.sin(2 * Math.PI * 2 * f * t) + 0.15 * Math.sin(2 * Math.PI * 3 * f * t)
+                        buf[pos + i] = (w / 1.5 * env * 0.95 * Short.MAX_VALUE).toInt().toShort()
+                    }
+                    pos += n + gap * rate / 1000
+                }
+                val track = android.media.AudioTrack.Builder()
+                    .setAudioAttributes(attrs)
+                    .setAudioFormat(
+                        android.media.AudioFormat.Builder().setSampleRate(rate)
+                            .setEncoding(android.media.AudioFormat.ENCODING_PCM_16BIT)
+                            .setChannelMask(android.media.AudioFormat.CHANNEL_OUT_MONO).build(),
+                    )
+                    .setTransferMode(android.media.AudioTrack.MODE_STATIC)
+                    .setBufferSizeInBytes(buf.size * 2)
+                    .build()
+                track.write(buf, 0, buf.size)
+                am?.requestAudioFocus(focus)
+                track.play()
+                Thread.sleep(total * 1000L / rate + 80)
+                track.release()
+                am?.abandonAudioFocusRequest(focus)
+            }
         }
     }
 
+    /** Nedtelling før «stå opp». */
+    fun beep() = play(Triple(1000.0, 90, 0))
+
+    /** Nytt intervall: bip-bip-BIIP. */
+    fun segmentChange() {
+        play(Triple(880.0, 110, 70), Triple(880.0, 110, 70), Triple(1320.0, 320, 0))
+        vibrate(400)
+    }
+
+    /** Stå opp: stigende. */
+    fun standUp() {
+        play(Triple(523.0, 150, 30), Triple(659.0, 150, 30), Triple(784.0, 150, 30), Triple(1047.0, 420, 0))
+        runCatching { vibrator?.vibrate(VibrationEffect.createWaveform(longArrayOf(0, 300, 150, 300, 150, 300), -1)) }
+    }
+
+    /** Sitt ned: synkende. */
     fun sitDown() {
-        tone?.startTone(ToneGenerator.TONE_PROP_ACK, 300)
+        play(Triple(1047.0, 180, 30), Triple(784.0, 180, 30), Triple(523.0, 380, 0))
         vibrate(600)
     }
 
     fun shutdown() {
-        tone?.release()
+        worker.shutdown()
     }
 }
 
 /**
- * «STÅ OPP» / «Gjør deg klar» / «SITT NED» der intervallnavnet står, så måleren beholder plassen.
- * Returnerer false når det ikke er noe å vise (da vises intervallnavnet).
+ * «STÅ OPP» / «Stå opp om …» / «SITT NED» i intervallruta, der «Dette intervallet» ellers står.
+ * Returnerer false når det ikke er noe å vise.
  */
 @Composable
 private fun StandTitle(cue: no.spinapp.core.StandCue, showSit: Boolean): Boolean {
@@ -576,9 +615,9 @@ private fun StandTitle(cue: no.spinapp.core.StandCue, showSit: Boolean): Boolean
         else -> return false
     }
     Box(
-        Modifier.padding(top = 2.dp).background(color, RoundedCornerShape(10.dp)).padding(horizontal = 12.dp, vertical = 2.dp),
+        Modifier.background(color, RoundedCornerShape(8.dp)).padding(horizontal = 8.dp, vertical = 2.dp),
     ) {
-        Text(text, fontSize = 26.sp, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 1, lineHeight = 32.sp)
+        Text(text, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 1, lineHeight = 22.sp)
     }
     return true
 }

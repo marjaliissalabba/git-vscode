@@ -114,16 +114,17 @@ fun PowerGauge(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.padding(top = side * 0.10f),
         ) {
-            Text(pct?.let { "${it.roundToInt()}%" } ?: "–", color = C.n100, fontSize = fs(52f),
-                fontWeight = FontWeight.SemiBold, fontFamily = Inter, lineHeight = fs(56f))
-            Text("${powerW ?: "–"} W", color = C.n100, fontSize = fs(20f), fontWeight = FontWeight.SemiBold, fontFamily = Inter, lineHeight = fs(24f))
-            Text(zone?.short ?: "av FTP", color = zone?.let { Color(it.argb) } ?: C.n500, fontSize = fs(14f), fontFamily = Inter, lineHeight = fs(18f))
-            Box(Modifier.padding(vertical = (7 * k).dp).width((24 * k).dp).height(1.dp).background(C.n600))
+            // Det viktigste er % av FTP og rpm; watt og sone er mindre
+            Text(pct?.let { "${it.roundToInt()}%" } ?: "–", color = C.n100, fontSize = fs(56f),
+                fontWeight = FontWeight.SemiBold, fontFamily = Inter, lineHeight = fs(60f))
+            Text("${powerW ?: "–"} W · ${zone?.short ?: "av FTP"}", color = zone?.let { Color(it.argb) } ?: C.n500,
+                fontSize = fs(14f), fontFamily = Inter, lineHeight = fs(18f))
+            Box(Modifier.padding(vertical = (8 * k).dp).width((24 * k).dp).height(1.dp).background(C.n600))
             val off = cadenceStatus == TargetStatus.LOW || cadenceStatus == TargetStatus.HIGH
             Row(verticalAlignment = Alignment.Bottom) {
-                Text("${cadence ?: "–"}", color = if (off) C.warn else C.n100, fontSize = fs(30f),
-                    fontWeight = FontWeight.SemiBold, fontFamily = Inter, lineHeight = fs(34f))
-                Text(" rpm", color = C.n400, fontSize = fs(13f), fontFamily = Inter, modifier = Modifier.padding(bottom = (5 * k).dp))
+                Text("${cadence ?: "–"}", color = if (off) C.warn else C.n100, fontSize = fs(50f),
+                    fontWeight = FontWeight.SemiBold, fontFamily = Inter, lineHeight = fs(54f))
+                Text(" rpm", color = C.n400, fontSize = fs(15f), fontFamily = Inter, modifier = Modifier.padding(bottom = (8 * k).dp))
             }
             // Kadensmålet vises under wattmålet over måleren; i buen står bare det du tråkker
         }
