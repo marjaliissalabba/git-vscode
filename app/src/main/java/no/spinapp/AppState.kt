@@ -94,6 +94,17 @@ object AppState {
         get() = prefs.getString("bleAddress", null)
         set(v) = prefs.edit().putString("bleAddress", v).apply()
 
+    /** Egne navn på Bluetooth-enheter (adresse → navn), f.eks. «Sykkel 8». Lagres bare på telefonen. */
+    fun bleNickname(address: String): String? = runCatching {
+        org.json.JSONObject(prefs.getString("bleNicknames", "{}")!!).optString(address).takeIf { it.isNotBlank() }
+    }.getOrNull()
+
+    fun setBleNickname(address: String, name: String?) {
+        val j = runCatching { org.json.JSONObject(prefs.getString("bleNicknames", "{}")!!) }.getOrDefault(org.json.JSONObject())
+        if (name.isNullOrBlank()) j.remove(address) else j.put(address, name.trim().take(40))
+        prefs.edit().putString("bleNicknames", j.toString()).apply()
+    }
+
     var bleName: String?
         get() = prefs.getString("bleName", null)
         set(v) = prefs.edit().putString("bleName", v).apply()

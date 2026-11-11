@@ -100,7 +100,7 @@ fun BleSetupScreen(onDone: () -> Unit) {
             if (!frozen) {
                 val now = System.currentTimeMillis()
                 val all = scanner.devices.value.values.filter { now - it.lastSeenMs < 10_000 }
-                val list = if (showAll) all else all.filter { it.isFitness }
+                val list = if (showAll) all else all.filter { it.isFitness || AppState.bleNickname(it.address) != null }
                 hidden = all.size - list.size
                 shown = list.sortedByDescending { it.smoothRssi }
             } else {
@@ -146,9 +146,13 @@ fun BleSetupScreen(onDone: () -> Unit) {
                         .border(1.dp, if (isNearest) C.accent else C.n800, RoundedCornerShape(12.dp))
                         .clickable { testing = d }.padding(12.dp),
                 ) {
+                    val nick = AppState.bleNickname(d.address)
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(d.name ?: "Ukjent · …${d.address.takeLast(5)}", Modifier.weight(1f), color = C.n100,
-                            fontWeight = FontWeight.SemiBold, fontSize = 16.sp, fontFamily = Inter)
+                        Column(Modifier.weight(1f)) {
+                            Text(nick ?: d.name ?: "Ukjent · …${d.address.takeLast(5)}", color = C.n100,
+                                fontWeight = FontWeight.SemiBold, fontSize = 16.sp, fontFamily = Inter)
+                            if (nick != null) Text(d.name ?: "…${d.address.takeLast(5)}", color = C.n400, fontSize = 12.sp, fontFamily = Inter)
+                        }
                         if (isNearest) Text("Nærmest deg", color = C.accent200, fontSize = 13.sp, fontFamily = Inter, fontWeight = FontWeight.SemiBold)
                         else if (d.address == last) Text("Valgt sist", color = C.n400, fontSize = 13.sp, fontFamily = Inter)
                     }
@@ -163,9 +167,10 @@ fun BleSetupScreen(onDone: () -> Unit) {
         OutlinedButton(onClick = onDone) { Text("Tilbake") }
     }
 
-    testing?.let { d -> BleTestDialog(d, onUse = {
+    testing?.let { d -> BleTestDialog(d, onUse = { nick ->
+        AppState.setBleNickname(d.address, nick)
         AppState.bleAddress = d.address
-        AppState.bleName = d.name ?: d.address
+        AppState.bleName = nick?.takeIf { it.isNotBlank() } ?: d.name ?: d.address
         AppState.sourceType = SourceType.BLUETOOTH
         testing = null
         activity.resetSource()
@@ -186,7 +191,8 @@ private fun SignalBars(rssi: Double) {
 
 /** Kobler til enheten og viser watt og rpm live, så du kan sjekke at det er din sykkel før du lagrer. */
 @Composable
-private fun BleTestDialog(d: no.spinapp.sources.FoundDevice, onUse: () -> Unit, onCancel: () -> Unit) {
+private fun BleTestDialog(d: no.spinapp.sources.FoundDevice, onUse: (String?) -> Unit, onCancel: () -> Unit) {
+    var nick by remember(d.address) { mutableStateOf(AppState.bleNickname(d.address) ?: "") }
     val context = LocalContext.current
     val source = remember(d.address) { no.spinapp.sources.BleSource(context.applicationContext, d.address) }
     DisposableEffect(d.address) {
@@ -198,7 +204,7 @@ private fun BleTestDialog(d: no.spinapp.sources.FoundDevice, onUse: () -> Unit, 
     androidx.compose.material3.AlertDialog(
         onDismissRequest = onCancel,
         containerColor = C.surface,
-        title = { Text(d.name ?: "Ukjent · …${d.address.takeLast(5)}", color = C.n100, fontFamily = Inter) },
+        title = { Text(AppState.bleNickname(d.address) ?: d.name ?: "Ukjent · …${d.address.takeLast(5)}", color = C.n100, fontFamily = Inter) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text("Tråkk litt og varier farten. Følger tallene deg, er dette sykkelen din.", color = C.n300, fontSize = 14.sp, fontFamily = Inter)
@@ -207,9 +213,16 @@ private fun BleTestDialog(d: no.spinapp.sources.FoundDevice, onUse: () -> Unit, 
                     Text("${sample?.powerW ?: "–"} W", color = C.n100, fontSize = 28.sp, fontFamily = Inter, fontWeight = FontWeight.Medium)
                     Text("${sample?.cadenceRpm ?: "–"} rpm", color = C.n100, fontSize = 28.sp, fontFamily = Inter, fontWeight = FontWeight.Medium)
                 }
+                // Eget navn, så sykkelen er lett å kjenne igjen neste gang
+                androidx.compose.material3.OutlinedTextField(
+                    value = nick, onValueChange = { nick = it.take(40) }, singleLine = true,
+                    label = { Text("Gi den et navn (valgfritt)") },
+                    placeholder = { Text("F.eks. Sykkel 8") },
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
         },
-        confirmButton = { TextButton(onClick = { source.stop(); onUse() }) { Text("Bruk denne", color = C.accent200) } },
+        confirmButton = { TextButton(onClick = { source.stop(); onUse(nick) }) { Text("Bruk denne", color = C.accent200) } },
         dismissButton = { TextButton(onClick = onCancel) { Text("Prøv en annen", color = C.n400) } },
     )
 }

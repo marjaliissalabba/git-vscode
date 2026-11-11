@@ -19,6 +19,8 @@ Android-app for trening på Stages-spinnesykkel: leser watt og kadens, viser hvo
 
 Prøv kildene i denne rekkefølgen: Bluetooth, så ANT+, så kamera.
 
+**I en sal med mange sykler:** tråkk, hold telefonen helt inntil konsollet til én enhet merkes «Nærmest deg», trykk på den og sjekk at watt og rpm følger deg. Gi den gjerne et navn (f.eks. «Sykkel 8») – navnet lagres bare på telefonen og vises i lista neste gang.
+
 ## Første gang på sykkelen
 
 1. Velg **Bluetooth** og trykk «Søk etter Bluetooth-enhet» mens du tråkker. Ser du en enhet merket «Watt», velger du den og trykker «Test datakilden».
