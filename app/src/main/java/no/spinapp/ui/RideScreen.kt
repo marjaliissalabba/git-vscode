@@ -12,6 +12,7 @@ import android.os.VibratorManager
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.size
@@ -208,15 +209,21 @@ fun RideScreen(activity: MainActivity, workout: Workout, onFinished: (RideSummar
     }
     val nowPlaying = remoteNow ?: sessionNow
 
-    Column(
-        Modifier
-            .fillMaxSize()
-            .background(Brush.radialGradient(listOf(Color(0xFF22243A), C.bg), center = Offset(540f, 1300f), radius = 1100f))
-            .statusBarsPadding()
-            .navigationBarsPadding()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
+    // Liggende: to kolonner (måleren til venstre), f.eks. for skjermdeling til TV
+    val landscape = androidx.compose.ui.platform.LocalConfiguration.current.orientation ==
+        android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    DisposableEffect(Unit) {
+        // Under økta kan skjermen snus (følger telefonens innstilling for autorotering)
+        activity.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_FULL_USER
+        onDispose { activity.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT }
+    }
+    // Måleren: målingene kommer ca. én gang i sekundet; tallene, pila og figurens fart
+    // glides mellom dem så det ikke hakker.
+        val smoothW by androidx.compose.animation.core.animateFloatAsState(
+            (state.powerW ?: 0).toFloat(), androidx.compose.animation.core.tween(900, easing = androidx.compose.animation.core.LinearEasing), label = "watt")
+        val smoothRpm by androidx.compose.animation.core.animateFloatAsState(
+            (state.cadenceRpm ?: 0).toFloat(), androidx.compose.animation.core.tween(900, easing = androidx.compose.animation.core.LinearEasing), label = "rpm")
+    val statusRow: @Composable () -> Unit = { 
         // 1. Statuslinje
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
             val sim = source?.type == no.spinapp.core.SourceType.SIMULATOR
@@ -235,6 +242,8 @@ fun RideScreen(activity: MainActivity, workout: Workout, onFinished: (RideSummar
             }.padding(horizontal = 10.dp, vertical = 12.dp), color = C.n400, fontSize = 15.sp, fontFamily = Inter)
         }
 
+    }
+    val musicRow: @Composable () -> Unit = { 
         // 2. Musikk (øverst, langt fra øktknappene)
         if (spotifyOn) {
             Row(
@@ -261,6 +270,8 @@ fun RideScreen(activity: MainActivity, workout: Workout, onFinished: (RideSummar
             }
         }
 
+    }
+    val titleRow: @Composable () -> Unit = { 
         // 3. Tittelrad: intervallets navn, eller «STÅ OPP» / «SITT NED» når det gjelder
         Row(verticalAlignment = Alignment.Bottom) {
             Column(Modifier.weight(1f)) {
@@ -277,6 +288,8 @@ fun RideScreen(activity: MainActivity, workout: Workout, onFinished: (RideSummar
             }
         }
 
+    }
+    val intervalCard: @Composable () -> Unit = { 
         // 4. Intervallkort
         Row(
             Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(zoneColor.copy(alpha = 0.14f))
@@ -311,6 +324,8 @@ fun RideScreen(activity: MainActivity, workout: Workout, onFinished: (RideSummar
             }
         }
 
+    }
+    val targetsRow: @Composable () -> Unit = { 
         // 5. Mål + status
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
@@ -321,12 +336,8 @@ fun RideScreen(activity: MainActivity, workout: Workout, onFinished: (RideSummar
             StatusPill(state)
         }
 
-        // 6. Måleren. Målingene kommer ca. én gang i sekundet; tallene, pila og figurens fart
-        // glides mellom dem så det ikke hakker.
-        val smoothW by androidx.compose.animation.core.animateFloatAsState(
-            (state.powerW ?: 0).toFloat(), androidx.compose.animation.core.tween(900, easing = androidx.compose.animation.core.LinearEasing), label = "watt")
-        val smoothRpm by androidx.compose.animation.core.animateFloatAsState(
-            (state.cadenceRpm ?: 0).toFloat(), androidx.compose.animation.core.tween(900, easing = androidx.compose.animation.core.LinearEasing), label = "rpm")
+    }
+    val gaugeView: @Composable (Modifier) -> Unit = { gaugeModifier ->
         PowerGauge(
             ftp = ftp,
             powerW = state.powerW?.let { kotlin.math.round(smoothW).toInt() },
@@ -338,11 +349,13 @@ fun RideScreen(activity: MainActivity, workout: Workout, onFinished: (RideSummar
             cadenceStatus = state.cadenceStatus,
             paused = paused,
             showSquirrel = remember { AppState.squirrelEnabled },
-            modifier = Modifier.fillMaxWidth().weight(1f),
+            modifier = gaugeModifier,
         )
 
+    }
+    val profileView: @Composable () -> Unit = { 
         // 7. Profil for hele økta
-        Canvas(Modifier.fillMaxWidth().height(58.dp)) {
+        Canvas(Modifier.fillMaxWidth().height(if (landscape) 40.dp else 58.dp)) {
             drawProfileProgress(workout, state.elapsedSec, state.segmentIndex)
         }
         Row {
@@ -350,6 +363,8 @@ fun RideScreen(activity: MainActivity, workout: Workout, onFinished: (RideSummar
             Text(formatTime(workout.durationSec), color = C.n400, fontSize = 12.sp, fontFamily = Inter)
         }
 
+    }
+    val controls: @Composable () -> Unit = { 
         // 8. Øktkontroller
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             ControlButton("⏮") { if (session.skipToPrevious()) refresh() }
@@ -359,6 +374,44 @@ fun RideScreen(activity: MainActivity, workout: Workout, onFinished: (RideSummar
                 icon = { if (paused) Icon(Ico.Play, C.n100, 18.dp) else Text("❚❚", color = C.n100, fontSize = 14.sp) },
             )
             ControlButton("⏭") { if (session.skipToNext()) refresh() }
+        }
+    }
+    Column(
+        Modifier
+            .fillMaxSize()
+            .background(Brush.radialGradient(listOf(Color(0xFF22243A), C.bg), center = Offset(540f, 1300f), radius = 1100f))
+            .statusBarsPadding()
+            .navigationBarsPadding()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        if (landscape) {
+            Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    statusRow()
+                    gaugeView(Modifier.fillMaxWidth().weight(1f))
+                    controls()
+                }
+                Column(
+                    Modifier.weight(1.15f).fillMaxHeight().verticalScroll(androidx.compose.foundation.rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    musicRow()
+                    titleRow()
+                    intervalCard()
+                    targetsRow()
+                    profileView()
+                }
+            }
+        } else {
+            statusRow()
+            musicRow()
+            titleRow()
+            intervalCard()
+            targetsRow()
+            gaugeView(Modifier.fillMaxWidth().weight(1f))
+            profileView()
+            controls()
         }
     }
 

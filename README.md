@@ -31,6 +31,7 @@ Prøv kildene i denne rekkefølgen: Bluetooth, så ANT+, så kamera.
 - **Lengde:** Velg f.eks. 40 min på en 50-minutters økt. Da blir alle intervallene 20 % kortere (avrundet til 5 s, minst 15 s).
 - **Stå opp:** Intervaller kan ha ståperioder. Øktskjermen viser «Gjør deg klar» 10 s før, et stort «STÅ OPP»-banner med nedtelling, og «SITT NED» etterpå, med pip og vibrasjon. Ingen opplesning.
 - **Neste intervall ⏭** og **Hopp over oppvarming** på øktskjermen.
+- **Liggende visning:** under økta kan telefonen snus. Da står måleren til venstre og intervall, mål og profil til høyre – fint for skjermdeling (Smart View / Cast skjerm) til TV.
 - **Øktbygger:** «+ Lag ny økt», eller «Lag egen versjon» av en ferdig økt. Endre navn, tid, % av FTP, kadens og ståperiode per intervall, kopier, flytt og slett. Egne økter lagres bare på telefonen.
 
 ## Treningsplaner
