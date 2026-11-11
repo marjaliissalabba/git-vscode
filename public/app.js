@@ -1,6 +1,11 @@
 'use strict';
 /* Lastbørs Norden – klient (ren JavaScript, ingen byggesteg). */
 
+// Demoversjonen (én HTML-fil uten server) setter window.__LASTBORS_EMBED: da kjører API-et i nettleseren og ruting skjer i minnet.
+const EMBED = !!window.__LASTBORS_EMBED;
+const ICONS = EMBED ? '' : '/icons.svg';
+let memHash = '#/';
+const currentHash = () => (EMBED ? memHash : location.hash || '#/');
 const $app = document.getElementById('app');
 const $tabs = document.getElementById('tabbar');
 const $sheetRoot = document.getElementById('sheet-root');
@@ -9,7 +14,7 @@ const S = { me: null, meta: null, integ: null, wizard: null, lastbors: { view: '
 // ======================================================================== hjelpere
 
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const icon = (name, cls = '') => `<svg class="ic ${cls}" aria-hidden="true"><use href="/icons.svg#i-${name}"/></svg>`;
+const icon = (name, cls = '') => `<svg class="ic ${cls}" aria-hidden="true"><use href="${ICONS}#i-${name}"/></svg>`;
 const NBSP = ' ';
 const kr = n => (n == null || n === '' ? '–' : Math.round(Number(n)).toLocaleString('nb-NO').replace(/\s/g, NBSP) + NBSP + 'kr');
 const tonn = t => (t == null ? '–' : `${String(Number(t)).replace('.', ',')}${NBSP}t`);
@@ -73,7 +78,10 @@ function toast(msg, isError = false) {
   toastTimer = setTimeout(() => t.classList.remove('show'), isError ? 4000 : 2600);
 }
 
-function go(hash) { if (location.hash === hash) render(); else location.hash = hash; }
+function go(hash) {
+  if (EMBED) { memHash = hash; render(); return; }
+  if (location.hash === hash) render(); else location.hash = hash;
+}
 async function guard(fn) { try { await fn(); } catch (err) { toast(err.message, true); } }
 function busy(btn, fn) {
   return async (...args) => {
@@ -143,7 +151,7 @@ function setChrome({ tabs = true, bar = false } = {}) {
     : r === 'shipper'
       ? [['#/', 'boxes', 'Mine laster'], ['#/legg-ut', 'circle-plus', 'Legg ut'], ['#/profil', 'building-2', 'Profil']]
       : [['#/', 'file-check', 'Dokumenter'], ['#/admin/firma', 'building-2', 'Firma'], ['#/admin/integrasjoner', 'plug', 'Integrasjoner'], ['#/profil', 'user', 'Profil']];
-  const cur = (location.hash || '#/').split('?')[0];
+  const cur = currentHash().split('?')[0];
   const section = { '#/last': '#/', '#/mine': '#/', '#/oppdrag': '#/oppdrag', '#/profil': '#/profil', '#/legg-ut': '#/legg-ut' };
   const curRoot = Object.keys(section).find(k => cur === k || cur.startsWith(k + '/')) ? section[Object.keys(section).find(k => cur === k || cur.startsWith(k + '/'))] : cur;
   $tabs.innerHTML = items.map(([href, ic, label, dot]) =>
@@ -193,12 +201,14 @@ function viewLogin() {
     </form>
     <h2>Demokontoer</h2>
     <p class="meta">Passord for alle: <b>demo1234</b></p>
+    ${EMBED ? `<p class="micro">Dataene lagres bare i denne nettleseren. <button class="btn ghost sm" id="reset" type="button">${icon('refresh-cw', 'sm')}Start demoen på nytt</button></p>` : ''}
     ${demo.map(([e, r, d]) => `<button class="card row" data-email="${e}"><div><div class="overline">${r}</div><b>${esc(d)}</b><div class="mono">${e}</div></div><span class="go"></span></button>`).join('')}
   </main>`;
   const login = async (email, password) => { await api('/auth/login', { method: 'POST', body: { email, password } }); await refreshMe(); go('#/'); };
   const f = document.getElementById('f');
   f.addEventListener('submit', e => { e.preventDefault(); busy(f.querySelector('button'), () => login(f.email.value, f.password.value))(); });
   $app.querySelectorAll('[data-email]').forEach(b => b.addEventListener('click', busy(b, () => login(b.dataset.email, 'demo1234'))));
+  document.getElementById('reset')?.addEventListener('click', () => { window.__LASTBORS_RESET?.(); });
 }
 
 /* Onboarding-veiviser: 1 Rolle → 2 Firma → 3 Dokumenter (kun transportør) → 4 Ferdig */
@@ -987,7 +997,7 @@ async function viewAdminDocs() {
         : d.type === 'adr' ? '<p class="micro" style="margin-top:8px">ADR-kompetansebevis har ikke et åpent register. Kontroller dokumentet manuelt.</p>' : '';
       return `<div class="card"><div class="row"><div><div class="overline">${esc(d.name)}</div><h3>${esc(d.company_name)}</h3><div class="meta"><span class="mono">${esc(d.orgnr)}</span> · sendt ${dFull(d.submitted_at)}</div></div>${reqBadge('pending')}</div>
         <div class="meta" style="margin-top:6px">Dokumentnr: ${esc(d.reference || '–')} · Gyldig til: ${dDay(d.valid_until)}</div>
-        ${d.file_name ? `<a href="/api/qualifications/${d.id}/file" target="_blank" rel="noopener" class="row-start" style="margin-top:6px">${icon('file-check', 'sm')}${esc(d.file_name)}</a>` : ''}
+        ${d.file_name ? (EMBED ? `<div class="row-start meta" style="margin-top:6px">${icon('file-check', 'sm')}${esc(d.file_name)}</div>` : `<a href="/api/qualifications/${d.id}/file" target="_blank" rel="noopener" class="row-start" style="margin-top:6px">${icon('file-check', 'sm')}${esc(d.file_name)}</a>`) : ''}
         ${check}
         <div class="btn-row">${d.type !== 'adr' ? `<button class="btn ghost sm" data-check="${d.id}">${icon('refresh-cw', 'sm')}Kjør registerkontroll</button>` : ''}
           <button class="btn danger sm" data-reject="${d.id}">Avvis</button><button class="btn accent sm" data-approve="${d.id}">Godkjenn</button></div></div>`;
@@ -1109,7 +1119,7 @@ async function viewAdminIntegrasjoner() {
 async function render() {
   closeSheet(true);
   if (map && !document.getElementById('map')) { map.remove(); map = null; }
-  const path = (location.hash || '#/').slice(1).split('?')[0] || '/';
+  const path = currentHash().slice(1).split('?')[0] || '/';
   try {
     if (!S.meta) S.meta = await api('/meta');
     if (!S.me) await refreshMe();
@@ -1148,8 +1158,18 @@ async function render() {
   }
 }
 
-window.addEventListener('hashchange', render);
-document.addEventListener('DOMContentLoaded', render);
+if (EMBED) {
+  // Interne lenker (#/...) håndteres i minnet
+  document.addEventListener('click', e => {
+    const a = e.target.closest && e.target.closest('a[href^="#"]');
+    if (!a) return;
+    e.preventDefault();
+    go(a.getAttribute('href'));
+  }, true);
+} else {
+  window.addEventListener('hashchange', render);
+}
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', render); else render();
 
 // Oppdaterer varsler og bekreftelser jevnlig mens appen er åpen.
 setInterval(async () => {
@@ -1164,4 +1184,4 @@ setInterval(async () => {
   }
 }, 30000);
 
-if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
+if (!EMBED && 'serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});

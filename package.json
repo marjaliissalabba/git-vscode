@@ -4,10 +4,17 @@
   "description": "Lastbørs Norden – last ut til prekvalifiserte transportører, til fastpris eller på lukket anbud",
   "private": true,
   "type": "commonjs",
-  "engines": { "node": ">=22.13" },
+  "engines": {
+    "node": ">=22.13"
+  },
   "scripts": {
     "start": "node --no-warnings server.js",
     "dev": "node --no-warnings --watch server.js",
-    "test": "node --no-warnings --test test/*.test.js"
+    "test": "node --no-warnings --test test/*.test.js",
+    "build:demo": "node demo/build.js"
+  },
+  "devDependencies": {
+    "buffer": "6.0.3",
+    "esbuild": "0.24.0"
   }
 }

@@ -38,6 +38,9 @@ Demokontoer (passord `demo1234`):
 
 På gratisplanen sovner appen etter 15 minutter uten bruk og bruker da et halvt minutt på å våkne. Databasen nullstilles ved omstart, og demodataene legges inn på nytt.
 
+**Demoversjon i én fil** (ingen server):
+`npm install && npm run build:demo` lager `demo/dist/lastbors-demo.html`. Der kjører hele serveren i nettleseren, med SQLite (sql.js), og dataene lagres i nettleserens localStorage. Ekte oppslag mot Brønnøysund og kartbakgrunnen virker ikke i denne versjonen.
+
 ## Teste koblingene (Brønnøysund m.fl.)
 
 Integrasjonene kjører i **simulert modus** som standard, slik at du kan teste uten nett og uten avtaler.
