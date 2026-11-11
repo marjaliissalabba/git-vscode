@@ -316,10 +316,7 @@ fun RideScreen(activity: MainActivity, workout: Workout, onFinished: (RideSummar
             Column(Modifier.weight(1f)) {
                 Text(if (seg != null) "Mål ${seg.powerLowPct}–${seg.powerHighPct} %" else "–", color = C.n100, fontSize = 24.sp, fontFamily = Inter, fontWeight = FontWeight.Medium)
                 if (seg != null) Text("${state.targetPowerLow}–${state.targetPowerHigh} W", color = C.n400, fontSize = 14.sp, fontFamily = Inter)
-                if (seg != null) {
-                    Text("Mål ${seg.cadenceLow}–${seg.cadenceHigh} rpm", color = C.n100, fontSize = 24.sp, fontFamily = Inter,
-                        fontWeight = FontWeight.Medium, modifier = Modifier.padding(top = 4.dp))
-                }
+                if (seg != null) Text("${seg.cadenceLow}–${seg.cadenceHigh} rpm", color = C.n400, fontSize = 14.sp, fontFamily = Inter)
             }
             StatusPill(state)
         }
