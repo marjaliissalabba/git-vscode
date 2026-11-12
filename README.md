@@ -35,6 +35,7 @@ Prøv kildene i denne rekkefølgen: Bluetooth, så ANT+, så kamera.
 - **Stå opp:** Intervaller kan ha ståperioder. Intervallruta viser når og hvor lenge («Stå opp om 1:20 · i 1:00»), så «STÅ OPP» med nedtelling og «SITT NED» etterpå. Starter neste intervall stående, står det i «Neste». Ingen opplesning og ingen vibrasjon (telefonen ligger på konsollet).
 - **Lyder:** nytt intervall = bip-bip-BIIP, stå opp = fire stigende toner, sitt ned = tre synkende toner. Faller stå opp sammen med et nytt intervall, spilles bare lyden for nytt intervall. Lydene spilles på alarmvolumet og demper musikken kort, så de høres over sangen.
 - **Neste intervall ⏭** og **Hopp over oppvarming** på øktskjermen.
+- **Rolig måler:** % og rpm vises som snitt over de siste 3 sekundene (velg 1/3/5/10 s under Profil → Visning under økta). Tallet og pila blir grønne når du er innenfor målet (±2 %), og «snitt i draget» viser hvordan hele draget går.
 - **Liggende visning:** under økta kan telefonen snus. Da står måleren til venstre og intervall, mål og profil til høyre – fint for skjermdeling (Smart View / Cast skjerm) til TV.
 - **Øktbygger:** «+ Lag ny økt», eller «Lag egen versjon» av en ferdig økt. Endre navn, tid, % av FTP, kadens og ståperiode per intervall, kopier, flytt og slett. Egne økter lagres bare på telefonen.
 

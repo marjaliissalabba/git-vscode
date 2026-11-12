@@ -61,6 +61,11 @@ fun PowerGauge(
     cadenceLow: Int?,
     cadenceHigh: Int?,
     cadenceStatus: TargetStatus,
+    /** Innenfor målet (med slingring)? Da blir tallet og pila grønne. Null = ingen mål. */
+    powerInTarget: Boolean? = null,
+    /** Snitt i draget (eller i økta), i % av FTP. */
+    avgPct: Int? = null,
+    avgLabel: String = "snitt i draget",
     paused: Boolean = false,
     showSquirrelLabel: Boolean = false,
     showSquirrel: Boolean = true,
@@ -106,7 +111,7 @@ fun PowerGauge(
                 drawArc(C.n100, a0, (ang(targetHighPct.toFloat()) - a0).coerceAtLeast(1.5f), false, tl2, sz2,
                     style = Stroke(5f * u, cap = StrokeCap.Round))
             }
-            if (pct != null) drawPointer(ang(pointer), r - 16f * u, 20f * u)
+            if (pct != null) drawPointer(ang(pointer), r - 16f * u, 20f * u, if (powerInTarget == true) C.good else C.n100)
         }
 
         // Innholdet i midten holdes innenfor buen (radius 128 av 300) og går litt ned i åpningen nederst
@@ -115,8 +120,11 @@ fun PowerGauge(
             modifier = Modifier.padding(top = side * 0.10f),
         ) {
             // Det viktigste er % av FTP og rpm; watt og sone er mindre
-            Text(pct?.let { "${it.roundToInt()}%" } ?: "–", color = C.n100, fontSize = fs(56f),
+            Text(pct?.let { "${it.roundToInt()}%" } ?: "–", color = if (powerInTarget == true) C.good else C.n100, fontSize = fs(56f),
                 fontWeight = FontWeight.SemiBold, fontFamily = Inter, lineHeight = fs(60f))
+            if (avgPct != null) {
+                Text("$avgLabel $avgPct %", color = C.n300, fontSize = fs(13f), fontFamily = Inter, lineHeight = fs(17f))
+            }
             Text("${powerW ?: "–"} W · ${zone?.short ?: "av FTP"}", color = zone?.let { Color(it.argb) } ?: C.n500,
                 fontSize = fs(14f), fontFamily = Inter, lineHeight = fs(18f))
             Box(Modifier.padding(vertical = (8 * k).dp).width((24 * k).dp).height(1.dp).background(C.n600))
@@ -141,7 +149,7 @@ fun PowerGauge(
     }
 }
 
-private fun DrawScope.drawPointer(angleDeg: Float, radius: Float, len: Float) {
+private fun DrawScope.drawPointer(angleDeg: Float, radius: Float, len: Float, color: Color = C.n100) {
     rotate(angleDeg, pivot = center) {
         val tipX = center.x + radius
         val baseX = tipX - len
@@ -151,6 +159,6 @@ private fun DrawScope.drawPointer(angleDeg: Float, radius: Float, len: Float) {
             lineTo(baseX, center.y + len * 0.42f)
             close()
         }
-        drawPath(path, C.n100)
+        drawPath(path, color)
     }
 }

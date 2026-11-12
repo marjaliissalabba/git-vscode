@@ -63,6 +63,11 @@ object AppState {
     /** Vekt for virtuell fart: oppgitt vekt, ellers 75 kg. */
     val riderKg: Double get() = weightKg.takeIf { it > 0 }?.toDouble() ?: 75.0
 
+    /** Utjevning av watt og rpm på øktskjermen, i sekunder (1, 3, 5 eller 10). Bare visning. */
+    var smoothSec: Int
+        get() = prefs.getInt("smoothSec", 3)
+        set(v) = prefs.edit().putInt("smoothSec", v.coerceIn(1, 10)).apply()
+
     /** Treningsplanen som følges (id i TrainingPlans), eller null. */
     var activePlanId: String?
         get() = prefs.getString("activePlan", null)

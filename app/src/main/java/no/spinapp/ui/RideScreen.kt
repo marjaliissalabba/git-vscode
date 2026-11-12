@@ -222,12 +222,25 @@ fun RideScreen(activity: MainActivity, workout: Workout, onFinished: (RideSummar
         activity.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_FULL_USER
         onDispose { activity.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT }
     }
-    // Måleren: målingene kommer ca. én gang i sekundet; tallene, pila og figurens fart
-    // glides mellom dem så det ikke hakker.
-        val smoothW by androidx.compose.animation.core.animateFloatAsState(
-            (state.powerW ?: 0).toFloat(), androidx.compose.animation.core.tween(900, easing = androidx.compose.animation.core.LinearEasing), label = "watt")
-        val smoothRpm by androidx.compose.animation.core.animateFloatAsState(
-            (state.cadenceRpm ?: 0).toFloat(), androidx.compose.animation.core.tween(900, easing = androidx.compose.animation.core.LinearEasing), label = "rpm")
+    // Måleren viser snitt over de siste sekundene (standard 3 s, Profil → Visning under økta), så
+    // tallet ikke hopper med hvert tråkk. Lagring og oppsummering bruker fortsatt hvert sekund.
+    val smoothSec = remember { AppState.smoothSec }
+    val running = !paused && state.elapsedSec > 0
+    val dispW: Int? = state.powerW?.let { if (running) session.recentAvgPower(smoothSec) ?: it else it }
+    val dispRpm: Int? = state.cadenceRpm?.let { if (running) session.recentAvgCadence(smoothSec) ?: it else it }
+    // Tallene glides mellom målingene så det ikke hakker
+    val smoothW by androidx.compose.animation.core.animateFloatAsState(
+        (dispW ?: 0).toFloat(), androidx.compose.animation.core.tween(900, easing = androidx.compose.animation.core.LinearEasing), label = "watt")
+    val smoothRpm by androidx.compose.animation.core.animateFloatAsState(
+        (dispRpm ?: 0).toFloat(), androidx.compose.animation.core.tween(900, easing = androidx.compose.animation.core.LinearEasing), label = "rpm")
+    // Innenfor målet med litt slingring (±2 prosentpoeng av FTP, ±3 rpm) regnes som truffet
+    val targetSeg = seg?.takeIf { !it.isFree }
+    val dispPct = dispW?.let { it * 100.0 / ftp }
+    val powerInTarget: Boolean? = if (targetSeg != null && dispPct != null)
+        dispPct >= targetSeg.powerLowPct - 2 && dispPct <= targetSeg.powerHighPct + 2 else null
+    val cadenceOff = targetSeg != null && dispRpm != null && (dispRpm < targetSeg.cadenceLow - 3 || dispRpm > targetSeg.cadenceHigh + 3)
+    // Snitt i draget (fri økt: snitt for hele økta)
+    val avgPct: Int? = (if (workout.isFree) session.rideAvgPower() else session.intervalAvgPower())?.let { it * 100 / ftp }
     val statusRow: @Composable () -> Unit = { 
         // 1. Statuslinje
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
@@ -361,13 +374,16 @@ fun RideScreen(activity: MainActivity, workout: Workout, onFinished: (RideSummar
     val gaugeView: @Composable (Modifier) -> Unit = { gaugeModifier ->
         PowerGauge(
             ftp = ftp,
-            powerW = state.powerW?.let { kotlin.math.round(smoothW).toInt() },
-            targetLowPct = seg?.takeIf { !it.isFree }?.powerLowPct,
-            targetHighPct = seg?.takeIf { !it.isFree }?.powerHighPct,
-            cadence = state.cadenceRpm?.let { kotlin.math.round(smoothRpm).toInt() },
+            powerW = dispW?.let { kotlin.math.round(smoothW).toInt() },
+            targetLowPct = targetSeg?.powerLowPct,
+            targetHighPct = targetSeg?.powerHighPct,
+            cadence = dispRpm?.let { kotlin.math.round(smoothRpm).toInt() },
             cadenceLow = seg?.cadenceLow,
             cadenceHigh = seg?.cadenceHigh,
-            cadenceStatus = state.cadenceStatus,
+            cadenceStatus = if (cadenceOff) TargetStatus.HIGH else TargetStatus.IN_RANGE,
+            powerInTarget = powerInTarget,
+            avgPct = avgPct,
+            avgLabel = if (workout.isFree) "snitt" else "snitt i draget",
             paused = paused,
             showSquirrel = remember { AppState.squirrelEnabled },
             modifier = gaugeModifier,

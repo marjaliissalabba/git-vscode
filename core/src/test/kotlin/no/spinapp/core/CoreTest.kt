@@ -304,3 +304,28 @@ class FreeRideTest {
         kotlin.test.assertTrue(sum.avgPower in 180..181)
     }
 }
+
+class DisplaySmoothingTest {
+    private fun sample(w: Int, c: Int = 90) = BikeSample(System.currentTimeMillis(), powerW = w, cadenceRpm = c, source = SourceType.SIMULATOR)
+
+    @Test
+    fun rollingAndIntervalAverages() {
+        val w = workout("t", "T", "") {
+            seg("A", 0.25, 95, 105, 85..95) // 15 s
+            seg("B", 0.25, 95, 105, 85..95)
+        }
+        val s = RideSession(w, 200)
+        listOf(100, 300, 200, 100, 300, 200).forEach { s.tick(sample(it)) }
+        assertEquals(200, s.recentAvgPower(3))
+        assertEquals(300, s.recentAvgPower(2).let { it!! + 50 }) // (300+200)/2 = 250
+        assertEquals(200, s.intervalAvgPower())
+        // Over i intervall B: snittet starter på nytt
+        repeat(9) { s.tick(sample(200)) }
+        s.tick(sample(400)); s.tick(sample(400))
+        assertEquals(null, s.intervalAvgPower()) // bare 2 s inn i B
+        s.tick(sample(100))
+        assertEquals(300, s.intervalAvgPower())
+        // Hopp til neste: ingen snitt før nye målinger
+        kotlin.test.assertTrue(s.skipToPrevious())
+    }
+}

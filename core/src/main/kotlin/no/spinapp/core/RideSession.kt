@@ -90,6 +90,10 @@ class RideSession(val workout: Workout, val ftp: Int) {
     /** Sekunder tråkket i intervallene som teller (ikke oppvarming/nedtrapping). */
     private var targetSeconds = 0
     private val ftpTestPower = ArrayList<Int>()
+    // Snitt i intervallet som pågår (til «snitt i draget» på skjermen)
+    private var avgSegIndex = -1
+    private var segPowerSum = 0L
+    private var segPowerN = 0
     var elapsedSec = 0
         private set
 
@@ -140,6 +144,8 @@ class RideSession(val workout: Workout, val ftp: Int) {
         val c = sample?.cadenceRpm ?: 0
         powerLog += p
         cadenceLog += c
+        if (before.segmentIndex != avgSegIndex) { avgSegIndex = before.segmentIndex; segPowerSum = 0; segPowerN = 0 }
+        segPowerSum += p; segPowerN++
         if (p > 0 || c > 0) {
             ridingSeconds++
             val z = Zone.forPower(p, ftp)
@@ -154,6 +160,23 @@ class RideSession(val workout: Workout, val ftp: Int) {
         elapsedSec++
         return state(sample)
     }
+
+    /** Snitt-watt de siste [seconds] sekundene (til visning; utjevner svingninger). */
+    fun recentAvgPower(seconds: Int): Int? =
+        powerLog.takeLast(seconds.coerceAtLeast(1)).takeIf { it.isNotEmpty() }?.average()?.roundToInt()
+
+    /** Snitt-kadens de siste [seconds] sekundene. */
+    fun recentAvgCadence(seconds: Int): Int? =
+        cadenceLog.takeLast(seconds.coerceAtLeast(1)).takeIf { it.isNotEmpty() }?.average()?.roundToInt()
+
+    /** Snitt-watt i intervallet som pågår (fra 3 sekunder inn). Null rett etter et bytte eller hopp. */
+    fun intervalAvgPower(): Int? {
+        val cur = workout.locate(elapsedSec)?.first ?: return null
+        return if (cur == avgSegIndex && segPowerN >= 3) (segPowerSum / segPowerN).toInt() else null
+    }
+
+    /** Snitt-watt for hele økta så langt. */
+    fun rideAvgPower(): Int? = if (powerLog.size >= 3) powerLog.average().roundToInt() else null
 
     /** Er vi i oppvarmingen nå? */
     fun inWarmup(): Boolean {

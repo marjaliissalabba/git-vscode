@@ -812,6 +812,17 @@ private fun ProfilTab(
     MusicCard()
 
     // Figuren ved måleren
+    SectionTitle("Visning under økta")
+    SpinCard {
+        var sm by remember { mutableIntStateOf(AppState.smoothSec) }
+        val opts = listOf(1, 3, 5, 10)
+        Muted("Utjevning av watt og rpm", 13, C.n300)
+        Spacer(Modifier.height(6.dp))
+        Segmented(opts.map { "$it s" }, opts.indexOf(sm).coerceAtLeast(0)) { sm = opts[it]; AppState.smoothSec = sm }
+        Spacer(Modifier.height(6.dp))
+        Muted("Måleren viser snittet over de siste sekundene, så tallet ikke hopper med hvert tråkk. 3 s passer de fleste; 5 s er roligere på lange drag. Lagring og oppsummering bruker hvert sekund uansett.", 13, C.n400)
+    }
+
     SectionTitle("Figuren")
     SquirrelCard(ftp)
 
