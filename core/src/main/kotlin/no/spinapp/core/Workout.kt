@@ -42,9 +42,11 @@ data class Segment(
     val stand: List<StandWindow> = emptyList(),
     /** Nedtrapping på slutten. */
     val isCooldown: Boolean = false,
+    /** Fri sykling uten mål (f.eks. gruppetime). */
+    val isFree: Boolean = false,
 ) {
-    /** Teller med i treffprosenten (ikke oppvarming eller nedtrapping). */
-    val countsForCompliance get() = !isWarmup && !isCooldown && !name.startsWith("Nedtrapping")
+    /** Teller med i treffprosenten (ikke oppvarming, nedtrapping eller fri sykling). */
+    val countsForCompliance get() = !isWarmup && !isCooldown && !isFree && !name.startsWith("Nedtrapping")
 
     val midPct get() = (powerLowPct + powerHighPct) / 2.0
     val midCadence get() = (cadenceLow + cadenceHigh) / 2
@@ -61,6 +63,9 @@ data class Workout(
     val segments: List<Segment>,
 ) {
     val durationSec get() = segments.sumOf { it.durationSec }
+
+    /** Fri økt uten mål: varer til man avslutter (inntil 4 timer). */
+    val isFree get() = segments.isNotEmpty() && segments.all { it.isFree }
 
     /** Segmentet og sekundet inn i segmentet ved [elapsedSec]. Null når økta er ferdig. */
     fun locate(elapsedSec: Int): Pair<Int, Int>? {
@@ -125,6 +130,13 @@ fun workout(id: String, name: String, description: String, block: WorkoutBuilder
 
 /** Øktene inneholder ikke oppvarming; den legges på før start (se [WorkoutComposer]). */
 object WorkoutLibrary {
+    /** Fri økt, f.eks. når du følger en gruppetime: ingen mål, bare måling og lagring. */
+    val freeRide = Workout(
+        "fri", "Fri økt / gruppetime",
+        "Ingen mål eller intervaller. Appen viser %, watt, rpm og tid, og lagrer økta. Trykk «Avslutt» når timen er ferdig.",
+        listOf(Segment("Fri sykling", 4 * 3600, 0, 0, 70, 110, isFree = true)),
+    )
+
     val endurance = workout("grunn45", "Grunntrening", "Rolig Z2 med kadensvariasjon. Bygger motor.") {
         repeat(3) {
             seg("Jevn Z2", 5.0, 65, 72, 85..95)
@@ -294,7 +306,7 @@ object WorkoutLibrary {
         cooldown(3)
     }
 
-    val all = listOf(endurance, threshold, vo2, climbSprint, pyramid, recovery, ftpTest,
+    val all = listOf(freeRide, endurance, threshold, vo2, climbSprint, pyramid, recovery, ftpTest,
         ntnu4x4, ntnu1x4, ronnestad3015, seiler4x8, zone2, sit4, sit5, sit6, tabata)
 
     fun byId(id: String) = all.firstOrNull { it.id == id }

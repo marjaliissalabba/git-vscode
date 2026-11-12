@@ -147,7 +147,7 @@ class SevenSegmentTest {
 class WorkoutTest {
     @Test
     fun libraryWorkoutsAreReasonable() {
-        for (w in WorkoutLibrary.all) {
+        for (w in WorkoutLibrary.all.filter { !it.isFree }) {
             assertTrue(w.durationSec in 10 * 60..60 * 60, "${w.name} varer ${w.durationSec / 60} min")
             assertTrue(w.segments.none { it.isWarmup }, "${w.name} skal ikke ha oppvarming")
             assertTrue(w.segments.all { it.powerLowPct <= it.powerHighPct && it.cadenceLow <= it.cadenceHigh })
@@ -285,5 +285,22 @@ class ComplianceTest {
         assertEquals(100, sum.cadenceCompliancePct)
         assertEquals(120, sum.durationSec)
         kotlin.test.assertTrue(w.segments.last().isCooldown)
+    }
+}
+
+class FreeRideTest {
+    @Test
+    fun freeRideHasNoTargetsAndCanBeEnded() {
+        val w = WorkoutComposer.compose(WorkoutLibrary.freeRide, 10)
+        kotlin.test.assertTrue(w.isFree)
+        assertEquals(1, w.segments.size) // ingen oppvarming lagt på
+        val s = RideSession(w, 200)
+        val st = s.tick(BikeSample(System.currentTimeMillis(), powerW = 250, cadenceRpm = 95, source = SourceType.SIMULATOR))
+        assertEquals(TargetStatus.NO_DATA, st.powerStatus)
+        repeat(600) { s.tick(BikeSample(System.currentTimeMillis(), powerW = 180, cadenceRpm = 90, source = SourceType.SIMULATOR)) }
+        val sum = s.summary()
+        kotlin.test.assertFalse(sum.hasTargets)
+        assertEquals(601, sum.durationSec)
+        kotlin.test.assertTrue(sum.avgPower in 180..181)
     }
 }

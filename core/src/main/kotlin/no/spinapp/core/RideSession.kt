@@ -44,6 +44,8 @@ data class RideSummary(
     val powerTrace: List<Int> = emptyList(),
     /** Virtuell distanse på flat vei (se [VirtualSpeed]), km. */
     val distanceKm: Double = 0.0,
+    /** Hadde økta mål å treffe? (Nei for fri økt.) */
+    val hasTargets: Boolean = true,
 ) {
     /** Forbrent energi: arbeidet (kJ) med ca. 24 % virkningsgrad gir omtrent like mange kcal som kJ. */
     val kcal get() = (kilojoules / (4.184 * 0.24)).roundToInt()
@@ -122,8 +124,8 @@ class RideSession(val workout: Workout, val ftp: Int) {
             powerW = power,
             cadenceRpm = cad,
             heartRateBpm = sample?.heartRateBpm,
-            powerStatus = if (seg == null) TargetStatus.NO_DATA else status(power, pLow, pHigh, tolerance(pLow)),
-            cadenceStatus = if (seg == null) TargetStatus.NO_DATA else status(cad, seg.cadenceLow, seg.cadenceHigh, 3),
+            powerStatus = if (seg == null || seg.isFree) TargetStatus.NO_DATA else status(power, pLow, pHigh, tolerance(pLow)),
+            cadenceStatus = if (seg == null || seg.isFree) TargetStatus.NO_DATA else status(cad, seg.cadenceLow, seg.cadenceHigh, 3),
             zone = power?.let { Zone.forPower(it, ftp) },
             stand = StandCues.at(seg, loc?.second ?: 0),
         )
@@ -222,6 +224,7 @@ class RideSession(val workout: Workout, val ftp: Int) {
             suggestedFtp = suggested,
             powerTrace = powerLog.chunked(15) { it.average().roundToInt() },
             distanceKm = VirtualSpeed.distanceKm(powerLog, riderKg),
+            hasTargets = targetSeconds > 0,
         )
     }
 

@@ -56,6 +56,7 @@ object WorkoutComposer {
 
     /** Ferdig økt: oppvarming + (eventuelt skalert) hoveddel. */
     fun compose(workout: Workout, warmupMinutes: Int, targetMinutes: Int? = null): Workout {
+        if (workout.isFree) return workout // fri økt: ingen oppvarming eller skalering
         val main = if (targetMinutes != null) scale(workout, targetMinutes).segments
         else workout.segments.filter { !it.isWarmup }
         return workout.copy(segments = Warmup.build(warmupMinutes) + main)

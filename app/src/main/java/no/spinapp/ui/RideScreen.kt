@@ -242,8 +242,8 @@ fun RideScreen(activity: MainActivity, workout: Workout, onFinished: (RideSummar
                     maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
             }
             Spacer(Modifier.width(8.dp))
-            // Tid igjen av økta
-            Text(formatTime(state.totalRemainingSec), color = C.n100, fontSize = 24.sp, fontFamily = Inter, fontWeight = FontWeight.Medium)
+            // Tid igjen av økta (fri økt: tiden står i ruta under)
+            if (!workout.isFree) Text(formatTime(state.totalRemainingSec), color = C.n100, fontSize = 24.sp, fontFamily = Inter, fontWeight = FontWeight.Medium)
             Text("×  Avslutt", Modifier.clip(RoundedCornerShape(8.dp)).clickable {
                 pausedBeforeEnd = paused; paused = true; endSheet = true
             }.padding(horizontal = 10.dp, vertical = 12.dp), color = C.n400, fontSize = 15.sp, fontFamily = Inter)
@@ -279,8 +279,21 @@ fun RideScreen(activity: MainActivity, workout: Workout, onFinished: (RideSummar
 
     }
     val intervalCard: @Composable () -> Unit = { 
-        // 4. Intervallkort
-        Row(
+        // 4. Intervallkort (fri økt: bare tiden som har gått)
+        if (workout.isFree) {
+            Row(
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(C.surface)
+                    .border(1.dp, C.n800, RoundedCornerShape(14.dp)).padding(horizontal = 14.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("Fri økt", color = C.n400, fontSize = 13.sp, fontFamily = Inter)
+                    Text(formatTime(state.elapsedSec), color = C.n100, fontSize = 38.sp, fontFamily = Inter, fontWeight = FontWeight.SemiBold, lineHeight = 42.sp)
+                }
+                Text("Trykk «Avslutt»\nnår timen er ferdig", color = C.n400, fontSize = 13.sp, fontFamily = Inter,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.End)
+            }
+        } else Row(
             Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(zoneColor.copy(alpha = 0.14f))
                 .border(1.dp, C.n800, RoundedCornerShape(14.dp)).padding(horizontal = 14.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -328,8 +341,8 @@ fun RideScreen(activity: MainActivity, workout: Workout, onFinished: (RideSummar
 
     }
     val targetsRow: @Composable () -> Unit = { 
-        // 5. Målene på én linje: Mål % · watt · rpm
-        if (seg != null) {
+        // 5. Målene på én linje: Mål % · watt · rpm (ingen mål i fri økt)
+        if (seg != null && !seg.isFree) {
             Text(
                 androidx.compose.ui.text.buildAnnotatedString {
                     withStyle(androidx.compose.ui.text.SpanStyle(color = C.n100, fontSize = 20.sp, fontWeight = FontWeight.Medium)) {
@@ -349,8 +362,8 @@ fun RideScreen(activity: MainActivity, workout: Workout, onFinished: (RideSummar
         PowerGauge(
             ftp = ftp,
             powerW = state.powerW?.let { kotlin.math.round(smoothW).toInt() },
-            targetLowPct = seg?.powerLowPct,
-            targetHighPct = seg?.powerHighPct,
+            targetLowPct = seg?.takeIf { !it.isFree }?.powerLowPct,
+            targetHighPct = seg?.takeIf { !it.isFree }?.powerHighPct,
             cadence = state.cadenceRpm?.let { kotlin.math.round(smoothRpm).toInt() },
             cadenceLow = seg?.cadenceLow,
             cadenceHigh = seg?.cadenceHigh,
@@ -362,11 +375,11 @@ fun RideScreen(activity: MainActivity, workout: Workout, onFinished: (RideSummar
 
     }
     val profileView: @Composable () -> Unit = { 
-        // 7. Profil for hele økta
-        Canvas(Modifier.fillMaxWidth().height(if (landscape) 40.dp else 58.dp)) {
+        // 7. Profil for hele økta (ikke i fri økt)
+        if (!workout.isFree) Canvas(Modifier.fillMaxWidth().height(if (landscape) 40.dp else 58.dp)) {
             drawProfileProgress(workout, state.elapsedSec, state.segmentIndex)
         }
-        Row {
+        if (!workout.isFree) Row {
             Text(formatTime(state.elapsedSec), Modifier.weight(1f), color = C.n400, fontSize = 12.sp, fontFamily = Inter)
             Text(formatTime(workout.durationSec), color = C.n400, fontSize = 12.sp, fontFamily = Inter)
         }
@@ -375,13 +388,13 @@ fun RideScreen(activity: MainActivity, workout: Workout, onFinished: (RideSummar
     val controls: @Composable () -> Unit = { 
         // 8. Øktkontroller
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            ControlButton("⏮") { if (session.skipToPrevious()) refresh() }
+            if (!workout.isFree) ControlButton("⏮") { if (session.skipToPrevious()) refresh() }
             AccentButton(
                 if (paused) (if (state.elapsedSec == 0) "Start" else "Fortsett") else "Pause",
                 { paused = !paused }, Modifier.weight(1f), big = true,
                 icon = { if (paused) Icon(Ico.Play, C.n100, 18.dp) else Text("❚❚", color = C.n100, fontSize = 14.sp) },
             )
-            ControlButton("⏭") {
+            if (!workout.isFree) ControlButton("⏭") {
                 if (session.skipToNext()) refresh()
                 else { pausedBeforeEnd = paused; paused = true; endSheet = true } // siste intervall: avslutte?
             }

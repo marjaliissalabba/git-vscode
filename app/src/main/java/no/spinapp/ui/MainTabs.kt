@@ -81,6 +81,7 @@ private fun dayShort(d: LocalDate) = d.dayOfWeek.getDisplayName(JTextStyle.SHORT
 private fun dayLong(d: LocalDate) = d.dayOfWeek.getDisplayName(JTextStyle.FULL, NB)
 
 fun categoryOf(w: Workout): String = when {
+    w.isFree -> "Fri"
     CustomWorkoutStore.isCustom(w.id) -> "Mine"
     w.id in setOf("grunn45", "restitusjon", "sone2") -> "Utholdenhet"
     w.id in setOf("terskel3x8", "pyramide", "seiler4x8", "ronnestad3015") -> "Terskel"
@@ -318,6 +319,7 @@ private fun TrenTab(
         }
     }
     AccentButton("Start økta", { onOpen(next) }, Modifier.fillMaxWidth(), big = true, icon = { Icon(Ico.Play, C.n100, 18.dp) })
+    LinkText("På gruppetime? Start fri økt uten mål  →") { onOpen(WorkoutLibrary.freeRide) }
 
     // Ukeplan
     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -378,7 +380,7 @@ private fun OkterTab(onOpen: (Workout) -> Unit, onBuild: () -> Unit, onPlan: (no
         AccentButton("Lag egen", onBuild, icon = { Icon(Ico.Plus, C.accent200, 14.dp) })
     }
     Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        listOf("Alle", "Planer", "Utholdenhet", "Terskel", "VO2maks", "Sprint", "Test", "Mine").forEach { c -> Pill(c, filter == c) { filter = c } }
+        listOf("Alle", "Planer", "Fri", "Utholdenhet", "Terskel", "VO2maks", "Sprint", "Test", "Mine").forEach { c -> Pill(c, filter == c) { filter = c } }
     }
     if (filter == "Alle" || filter == "Planer") {
         SectionTitle("Treningsplaner")
@@ -487,6 +489,20 @@ private fun WorkoutSheet(w: Workout, ftp: Int, onStart: (Workout) -> Unit, onEdi
     val composed = remember(w, warmup, length) { WorkoutComposer.compose(w, warmup, if (length == original) null else length) }
     val main = remember(w, length) { if (length == original) w else WorkoutComposer.scale(w, length) }
 
+    if (w.isFree) {
+        Column(
+            Modifier.fillMaxWidth().padding(horizontal = 18.dp).padding(bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Muted("Fri", 13, C.n300)
+            Text(w.name, color = C.n100, fontSize = 28.sp, fontFamily = Inter, fontWeight = FontWeight.Medium)
+            Muted(w.description, 15, C.n300)
+            Muted("Tips: koble til sykkelen før timen starter. Står du på en gruppetime med storskjerm, går det som regel fint å bruke Bluetooth samtidig.", 13, C.n400)
+            AccentButton("Start fri økt", { onStart(composed) }, Modifier.fillMaxWidth(), big = true,
+                icon = { Icon(Ico.Play, C.n100, 18.dp) })
+        }
+        return
+    }
     Column(
         Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 18.dp).padding(bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -641,7 +657,7 @@ private fun LoggTab(ftp: Int, onOpen: (RideRecord) -> Unit) {
             }
             Column(horizontalAlignment = Alignment.End) {
                 Text("${r.avgPower} W", color = C.n100, fontSize = 15.sp, fontFamily = Inter, fontWeight = FontWeight.Medium)
-                Muted("${r.durationSec / 60} min · ${r.powerCompliancePct}%", 12)
+                Muted("${r.durationSec / 60} min" + if (r.workoutId == "fri") " · fri økt" else " · ${r.powerCompliancePct}%", 12)
             }
         }
     }
@@ -659,7 +675,7 @@ private fun RideSheet(r: RideRecord, onDelete: () -> Unit) {
             StatTile("Tid", "${r.durationSec / 60} min", Modifier.weight(1f))
             StatTile("Snitt", "${r.avgPower} W", Modifier.weight(1f))
             StatTile("TSS", "${r.tss}", Modifier.weight(1f))
-            StatTile("I mål", "${r.powerCompliancePct}%", Modifier.weight(1f))
+            StatTile("I mål", if (r.workoutId == "fri") "–" else "${r.powerCompliancePct}%", Modifier.weight(1f))
         }
         Box(Modifier.fillMaxWidth().height(110.dp)) {
             if (w != null) ProfileBars(w, Modifier.fillMaxSize().alpha(0.35f), ftpLine = true)

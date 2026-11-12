@@ -29,6 +29,7 @@ Prøv kildene i denne rekkefølgen: Bluetooth, så ANT+, så kamera.
 
 ## Økter
 
+- **Fri økt / gruppetime:** ingen mål eller intervaller – appen viser %, watt, rpm og tid og lagrer økta når du trykker «Avslutt». Finnes øverst i øktlista og som snarvei på Tren-fanen.
 - **Oppvarming** er ikke en del av øktene. Når du trykker Start, velger du 0, 5, 8, 10 eller 15 min oppvarming (appen husker valget).
 - **Lengde:** Velg f.eks. 40 min på en 50-minutters økt. Da blir alle intervallene 20 % kortere (avrundet til 5 s, minst 15 s).
 - **Stå opp:** Intervaller kan ha ståperioder. Intervallruta viser når og hvor lenge («Stå opp om 1:20 · i 1:00»), så «STÅ OPP» med nedtelling og «SITT NED» etterpå. Starter neste intervall stående, står det i «Neste». Ingen opplesning og ingen vibrasjon (telefonen ligger på konsollet).

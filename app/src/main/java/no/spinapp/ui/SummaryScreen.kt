@@ -59,7 +59,7 @@ fun SummaryScreen(summary: RideSummary, onDone: () -> Unit) {
             StatPair("Snittfart", "${d1(summary.avgSpeedKmh)} km/t",
                 "Energi per time", if (hours > 0) "${(summary.kcal / hours).toInt()} kcal/t" else "–")
             StatPair("NP", "${summary.normalizedPower} W", "TSS", "${summary.tss}")
-            StatPair("I målsone, watt", "${summary.powerCompliancePct} %", "I målsone, rpm", "${summary.cadenceCompliancePct} %")
+            if (summary.hasTargets) StatPair("I målsone, watt", "${summary.powerCompliancePct} %", "I målsone, rpm", "${summary.cadenceCompliancePct} %")
             if (weight > 0) StatPair("Snitt W/kg", d1(summary.avgPower.toDouble() / weight), "FTP W/kg", d1(ftp.toDouble() / weight))
             else StatPair("FTP", "$ftp W", "", "")
             Spacer(Modifier.height(4.dp))
