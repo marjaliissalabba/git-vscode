@@ -1,0 +1,901 @@
+<meta charset="utf-8">
+<title>Ekorn Sprite-studio</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+/* Layout: arbeidsbenk – klipp til venstre, stort lerret i midten, forhåndsvisning og bildeinfo til høyre, tidslinje under. */
+:root {
+  --bg: #12141f;
+  --panel: #1c1e2b;
+  --panel-2: #232532;
+  --line: #3a3d4b;
+  --text: #e9e9ed;
+  --muted: #9a9eb2;
+  --faint: #6c7084;
+  --accent: #9184d9;
+  --accent-ink: #e7e5fe;
+  --accent-tint: rgba(145, 132, 217, 0.16);
+  --anchor: #f2c14e;
+  --ok: #3db877;
+  --warn: #ec9238;
+  --font-ui: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-num: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  background: var(--bg); color: var(--text); font: 14px/1.45 var(--font-ui);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 14px 24px;
+}
+button, input, select { font: inherit; color: inherit; }
+.top { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin-bottom: 14px; }
+.brand { display: flex; align-items: baseline; gap: 10px; margin-right: auto; }
+.brand h1 { font-size: 20px; font-weight: 500; margin: 0; letter-spacing: -0.01em; }
+.brand span { color: var(--muted); font-size: 13px; }
+.btn {
+  min-height: 40px; padding: 8px 14px; border-radius: 8px; border: 1px solid var(--line);
+  background: transparent; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; white-space: nowrap;
+}
+.btn:hover { background: var(--panel-2); }
+.btn.primary { border-color: var(--accent); background: var(--accent-tint); color: var(--accent-ink); box-shadow: 0 0 22px rgba(145,132,217,.18); }
+.btn.small { min-height: 34px; padding: 5px 10px; font-size: 13px; }
+.btn:focus-visible, .clip:focus-visible, .thumb:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.btn[aria-pressed="true"] { border-color: var(--accent); color: var(--accent-ink); background: var(--accent-tint); }
+.status { color: var(--muted); font-size: 13px; min-height: 18px; }
+.status.ok { color: var(--ok); } .status.warn { color: var(--warn); }
+
+.bench { display: grid; grid-template-columns: 220px minmax(0, 1fr) 260px; gap: 14px; align-items: start; }
+@media (max-width: 1050px) { .bench { grid-template-columns: 200px minmax(0, 1fr); } .side { grid-column: 1 / -1; } }
+@media (max-width: 720px) { .bench { grid-template-columns: minmax(0, 1fr); } }
+
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 12px; min-width: 0; }
+.panel h2 { font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 4px 4px 8px; }
+.clips { display: flex; flex-direction: column; gap: 2px; }
+@media (max-width: 720px) { .clips { flex-direction: row; overflow-x: auto; padding-bottom: 4px; } .clips h2 { display: none; } }
+.clip {
+  display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; padding: 8px 8px; border-radius: 8px;
+  border: 1px solid transparent; background: transparent; cursor: pointer; min-height: 40px; white-space: nowrap;
+}
+.clip:hover { background: var(--panel-2); }
+.clip.on { border-color: var(--accent); background: var(--accent-tint); color: var(--accent-ink); }
+.clip .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--faint); flex: none; }
+.clip .dot.part { background: var(--warn); } .clip .dot.done { background: var(--ok); }
+.clip .meta { margin-left: auto; color: var(--faint); font: 12px var(--font-num); }
+
+.stage { display: flex; flex-direction: column; gap: 10px; }
+.canvasWrap { position: relative; width: 100%; max-width: 640px; aspect-ratio: 1; margin: 0 auto; border-radius: 12px; overflow: hidden; border: 1px solid var(--line); }
+#editor { width: 100%; height: 100%; display: block; cursor: crosshair; touch-action: none; }
+.toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: center; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg button { border: 0; border-radius: 0; min-height: 34px; padding: 5px 10px; background: transparent; cursor: pointer; font-size: 13px; }
+.seg button[aria-pressed="true"] { background: var(--accent-tint); color: var(--accent-ink); }
+label.inline { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 13px; }
+select { background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; min-height: 34px; padding: 4px 8px; }
+
+.timeline { display: flex; gap: 8px; overflow-x: auto; padding: 4px 2px 8px; }
+.thumb { flex: none; width: 92px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel-2); padding: 6px; cursor: pointer; display: flex; flex-direction: column; gap: 6px; }
+.thumb.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+.thumb canvas { width: 78px; height: 78px; display: block; border-radius: 6px; background: #0d0e16; }
+.thumb .row { display: flex; align-items: center; gap: 4px; }
+.thumb .n { font: 11px var(--font-num); color: var(--muted); }
+.thumb .mark { margin-left: auto; width: 7px; height: 7px; border-radius: 50%; background: var(--faint); }
+.thumb .mark.set { background: var(--anchor); }
+.thumb input { width: 100%; background: #12141f; border: 1px solid var(--line); border-radius: 6px; padding: 3px 4px; font: 12px var(--font-num); text-align: right; }
+.thumb .ms { font: 10px var(--font-num); color: var(--faint); text-align: right; margin-top: -4px; }
+
+.side { display: flex; flex-direction: column; gap: 14px; }
+#preview { width: 192px; height: 192px; display: block; margin: 0 auto; border-radius: 10px; background: #161826; border: 1px solid var(--line); }
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; font-size: 13px; }
+.kv dt { color: var(--muted); } .kv dd { margin: 0; font-family: var(--font-num); text-align: right; font-variant-numeric: tabular-nums; }
+.nudge { display: grid; grid-template-columns: repeat(3, 44px); gap: 6px; justify-content: center; }
+.nudge button { width: 44px; height: 44px; padding: 0; justify-content: center; }
+.nudge .c { visibility: hidden; }
+.help { color: var(--muted); font-size: 12.5px; line-height: 1.5; }
+.help kbd { font: 11px var(--font-num); border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 0 4px; color: var(--text); }
+.stack { display: flex; flex-direction: column; gap: 8px; }
+.row2 { display: flex; gap: 8px; flex-wrap: wrap; }
+textarea#jsonOut { width: 100%; height: 120px; background: #0d0e16; color: var(--muted); border: 1px solid var(--line); border-radius: 8px; font: 11px var(--font-num); }
+.thumb .jump { height: 4px; border-radius: 2px; background: var(--line); overflow: hidden; }
+.thumb .jump i { display: block; height: 100%; background: var(--ok); }
+.thumb .jump.bad i { background: var(--warn); }
+.thumb.bad { border-color: var(--warn); }
+.findings { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+.findings li { border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; cursor: pointer; }
+.findings li.bad { border-color: var(--warn); }
+.findings li:hover { background: var(--panel-2); }
+.tools { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.tools button { border: 0; border-radius: 0; min-height: 34px; padding: 5px 10px; background: transparent; cursor: pointer; font-size: 13px; }
+.tools button[aria-pressed="true"] { background: var(--accent-tint); color: var(--accent-ink); }
+.xf { display: grid; grid-template-columns: auto 1fr; gap: 6px 10px; align-items: center; font-size: 13px; }
+.xf label { color: var(--muted); }
+.xf input[type=number] { width: 100%; background: #12141f; border: 1px solid var(--line); border-radius: 6px; padding: 4px 6px; font-family: var(--font-num); text-align: right; }
+.xf input[type=range] { width: 100%; accent-color: var(--accent); }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+</style>
+
+<header class="top">
+  <div class="brand"><h1>Ekorn Sprite-studio</h1><span id="packName">Laster pakken …</span></div>
+  <button class="btn small" id="undoBtn" type="button" title="Angre (Ctrl+Z)" disabled>↶ Angre</button>
+  <button class="btn small" id="redoBtn" type="button" title="Gjør om (Ctrl+Shift+Z)" disabled>↷ Gjør om</button>
+  <label class="btn" for="fileIn">Åpne pakke (zip eller filer)</label>
+  <input id="fileIn" type="file" multiple accept=".zip,.json,.png" hidden>
+  <button class="btn" id="copyBtn" type="button">Kopier JSON</button>
+  <button class="btn primary" id="saveBtn" type="button">Lagre animations.json</button>
+</header>
+<p class="status" id="status" role="status"></p>
+
+<div class="bench">
+  <nav class="panel clips" id="clipList" aria-label="Klipp"></nav>
+
+  <section class="stage">
+    <div class="canvasWrap"><canvas id="editor" width="1024" height="1024" aria-label="Rediger ankerpunkt: klikk der bekkenet er"></canvas></div>
+    <div class="toolbar">
+      <div class="tools" role="group" aria-label="Verktøy">
+        <button type="button" data-tool="anchor" aria-pressed="true" title="Klikk for å sette ankeret (A)">⊕ Anker</button>
+        <button type="button" data-tool="move" aria-pressed="false" title="Dra for å flytte figuren (V)">✥ Flytt</button>
+        <button type="button" data-tool="rotate" aria-pressed="false" title="Dra rundt ankeret for å rotere (R). Shift = 15°-steg">⟳ Roter</button>
+        <button type="button" data-tool="scale" aria-pressed="false" title="Dra bort fra / mot ankeret for å skalere (S)">⤢ Skaler</button>
+      </div>
+      <label class="inline" for="allFrames"><input type="checkbox" id="allFrames"> Alle bilder i klippet</label>
+    </div>
+    <div class="toolbar">
+      <button class="btn small" id="prevBtn" type="button" title="Forrige bilde ( , )">◀</button>
+      <button class="btn small" id="playBtn" type="button" aria-pressed="false">▶ Spill</button>
+      <button class="btn small" id="nextBtn" type="button" title="Neste bilde ( . )">▶</button>
+      <div class="seg" role="group" aria-label="Visning">
+        <button type="button" id="viewAligned" aria-pressed="true">Justert etter anker</button>
+        <button type="button" id="viewRaw" aria-pressed="false">Rå rute</button>
+      </div>
+      <label class="inline" for="onion">Løkspeil
+        <select id="onion">
+          <option value="prev">Forrige bilde</option>
+          <option value="first">Første bilde</option>
+          <option value="target">Målklippets første bilde</option>
+          <option value="off">Av</option>
+        </select>
+      </label>
+      <label class="inline" for="zoom">Zoom
+        <select id="zoom"><option value="1" selected>100 %</option><option value="1.5">150 %</option><option value="2">200 %</option><option value="3">300 %</option></select>
+      </label>
+    </div>
+    <div class="timeline" id="timeline" aria-label="Bilder i klippet"></div>
+  </section>
+
+  <aside class="side">
+    <div class="panel stack">
+      <h2>Forhåndsvisning i appen</h2>
+      <canvas id="preview" width="384" height="384" aria-label="Forhåndsvisning 64 dp"></canvas>
+      <div class="row2" style="justify-content:center">
+        <label class="inline" for="chain"><input type="checkbox" id="chain" checked> Kjede overgang med løkkene</label>
+        <label class="inline" for="blend"><input type="checkbox" id="blend"> Myk blanding (valgfritt i appen)</label>
+      </div>
+      <p class="help" id="previewHelp"></p>
+    </div>
+    <div class="panel stack">
+      <h2>Valgt bilde</h2>
+      <dl class="kv">
+        <dt>Klipp</dt><dd id="kClip">–</dd>
+        <dt>Bilde</dt><dd id="kFrame">–</dd>
+        <dt>Anker x, y</dt><dd id="kAnchor">–</dd>
+        <dt>Varighet</dt><dd id="kDur">–</dd>
+        <dt>Form</dt><dd id="kXf">–</dd>
+      </dl>
+      <div class="nudge" aria-label="Flytt anker">
+        <span class="c"></span><button class="btn" type="button" data-n="0,-1" aria-label="Anker opp">↑</button><span class="c"></span>
+        <button class="btn" type="button" data-n="-1,0" aria-label="Anker venstre">←</button><button class="btn" type="button" id="resetAnchor" aria-label="Nullstill anker">○</button><button class="btn" type="button" data-n="1,0" aria-label="Anker høyre">→</button>
+        <span class="c"></span><button class="btn" type="button" data-n="0,1" aria-label="Anker ned">↓</button><span class="c"></span>
+      </div>
+      <div class="row2">
+        <button class="btn small" id="anchorFromPrev" type="button">Anker fra forrige</button>
+        <button class="btn small" id="anchorToAll" type="button">Anker til alle</button>
+      </div>
+      <h2 style="margin-top:10px">Flytt, roter og skaler</h2>
+      <div class="xf">
+        <label for="xfX">Flytt x (px)</label><input id="xfX" type="number" step="1">
+        <label for="xfY">Flytt y (px)</label><input id="xfY" type="number" step="1">
+        <label for="xfR">Rotasjon (°)</label><input id="xfR" type="number" step="0.5" min="-180" max="180">
+        <span></span><input id="xfRr" type="range" min="-180" max="180" step="0.5" aria-label="Rotasjon">
+        <label for="xfS">Skala (%)</label><input id="xfS" type="number" step="1" min="10" max="400">
+        <label for="xfF">Speilvend</label><span><input id="xfF" type="checkbox"></span>
+      </div>
+      <div class="row2">
+        <button class="btn small" id="xfReset" type="button">Nullstill form</button>
+        <button class="btn small" id="xfFromPrev" type="button">Form fra forrige</button>
+        <button class="btn small" id="xfToAll" type="button">Form til alle</button>
+      </div>
+      <div class="row2">
+        <label class="inline" for="durAll">Varighet alle (ms)</label>
+        <input id="durAll" type="number" min="10" max="2000" step="5" style="width:80px;background:#12141f;border:1px solid var(--line);border-radius:6px;padding:4px 6px;font-family:var(--font-num)">
+        <button class="btn small" id="durAllBtn" type="button">Bruk</button>
+      </div>
+    </div>
+    <div class="panel stack">
+      <h2>Automatikk</h2>
+      <p class="help">Sett ankeret på bekkenet i første bilde av klippet. Auto-anker finner samme punkt i resten. For overganger brukes løkkene før og etter som referanse.</p>
+      <div class="row2">
+        <button class="btn small" id="autoClip" type="button">Auto-anker: dette klippet</button>
+        <button class="btn small" id="autoAll" type="button">Auto-anker: alle klipp</button>
+      </div>
+      <div class="row2">
+        <button class="btn small" id="findJumps" type="button">Finn hakk i dette klippet</button>
+        <button class="btn small" id="findAll" type="button">Finn hakk overalt</button>
+      </div>
+      <ul class="findings" id="findings"></ul>
+    </div>
+    <div class="panel help">
+      <h2>Slik gjør du</h2>
+      Klikk på bekkenet til ekornet i hvert bilde. I visningen «Justert etter anker» står ankeret alltid i krysset, så når alle bilder er riktige, står kroppen stille mens du blar.
+      Løkspeilet viser et annet bilde svakt bak, så du kan treffe samme punkt.<br><br>
+      Verktøyene <b>Flytt</b>, <b>Roter</b> og <b>Skaler</b> endrer selve figuren. Roteringen skjer rundt ankeret. Den stiplede ruta er det som kommer med i appen. Kryss av «Alle bilder i klippet» for å endre hele klippet på én gang.<br><br>
+      <kbd>A</kbd> <kbd>V</kbd> <kbd>R</kbd> <kbd>S</kbd> velg verktøy · <kbd>Q</kbd> <kbd>E</kbd> roter 1° (<kbd>Shift</kbd> = 5°) · <kbd>+</kbd> <kbd>−</kbd> skala 1 % · <kbd>H</kbd> speilvend · <kbd>Ctrl</kbd>+<kbd>Z</kbd> angre.<br>
+      <kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd> flytt ankeret (med Flytt-verktøyet: figuren) 1 px (<kbd>Shift</kbd> = 5 px) ·
+      <kbd>,</kbd> <kbd>.</kbd> forrige/neste bilde · <kbd>Mellomrom</kbd> spill/stopp.<br><br>
+      Varigheten per bilde gjelder i appen som rytme: for løp og klatring styrer kadensen den samlede farten, og varighetene bestemmer hvilke bilder som vises lenger.
+    </div>
+    <div class="panel stack">
+      <h2>JSON (til kopiering)</h2>
+      <textarea id="jsonOut" readonly aria-label="Eksportert JSON"></textarea>
+    </div>
+  </aside>
+</div>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const statusEl = $("status");
+  const setStatus = (t, kind = "") => { statusEl.textContent = t; statusEl.className = "status " + kind; };
+
+  // ---------- State ----------
+  let meta = null;          // animations.json
+  let sheets = {};          // name -> HTMLImageElement
+  let packKey = "default";
+  let clipNames = [];
+  let clipName = null;
+  let frameIdx = 0;
+  let view = "aligned";
+  let playing = false;
+  // edits[clip][i] = {ax, ay, d}   (anker i rutens piksler, varighet i ms)
+  let edits = {};
+
+  const LS = "ekornStudio:";
+  const lsGet = (k) => { try { return JSON.parse(localStorage.getItem(LS + k) || "null"); } catch (e) { return null; } };
+  const lsSet = (k, v) => { try { localStorage.setItem(LS + k, JSON.stringify(v)); } catch (e) { /* ingen lagring */ } };
+
+  const clip = () => meta.clips[clipName];
+  const frames = (name = clipName) => meta.clips[name].frames;
+  function frameData(name, i) {
+    const f = frames(name)[i];
+    const c = meta.clips[name];
+    const e = (edits[name] || [])[i] || {};
+    return {
+      f, sheet: sheets[c.sheet],
+      ax: e.ax ?? f.anchor?.x ?? f.w / 2,
+      ay: e.ay ?? f.anchor?.y ?? f.h / 2,
+      d: e.d ?? f.durationMs ?? Math.round(1000 / (c.fps || 10)),
+      set: e.ax != null || f.anchor != null,
+      // Form: flytting (rutens px), rotasjon (grader, med klokka, rundt ankeret), skala og speilvending
+      tx: e.tx ?? f.transform?.x ?? 0,
+      ty: e.ty ?? f.transform?.y ?? 0,
+      rot: e.rot ?? f.transform?.rotation ?? 0,
+      sc: e.sc ?? f.transform?.scale ?? 1,
+      fx: e.fx ?? f.transform?.flipX ?? false,
+    };
+  }
+  const hasXf = (fd) => fd.tx || fd.ty || fd.rot || fd.sc !== 1 || fd.fx;
+  // Tegner bildet med ankeret i (cx, cy) og formen brukt. s = skjermpiksler per rutepiksel.
+  function drawXf(g, fd, cx, cy, s, alpha = 1, outline = null) {
+    g.save();
+    g.globalAlpha = alpha;
+    g.translate(cx + fd.tx * s, cy + fd.ty * s);
+    g.rotate(fd.rot * Math.PI / 180);
+    g.scale(fd.sc * (fd.fx ? -1 : 1), fd.sc);
+    g.drawImage(fd.sheet, fd.f.x, fd.f.y, fd.f.w, fd.f.h, -fd.ax * s, -fd.ay * s, fd.f.w * s, fd.f.h * s);
+    if (outline) { g.strokeStyle = outline; g.lineWidth = 2 / fd.sc; g.strokeRect(-fd.ax * s, -fd.ay * s, fd.f.w * s, fd.f.h * s); }
+    g.restore();
+  }
+  // Angre / gjør om
+  const undoStack = [], redoStack = [];
+  function snap() {
+    undoStack.push(JSON.stringify(edits));
+    if (undoStack.length > 300) undoStack.shift();
+    redoStack.length = 0; updateUndo();
+  }
+  function updateUndo() { $("undoBtn").disabled = !undoStack.length; $("redoBtn").disabled = !redoStack.length; }
+  function undo() { if (!undoStack.length) return; redoStack.push(JSON.stringify(edits)); edits = JSON.parse(undoStack.pop()); lsSet(packKey, edits); updateUndo(); refreshAll(); setStatus("Angret."); }
+  function redo() { if (!redoStack.length) return; undoStack.push(JSON.stringify(edits)); edits = JSON.parse(redoStack.pop()); lsSet(packKey, edits); updateUndo(); refreshAll(); setStatus("Gjort om."); }
+  function setRaw(name, i, patch) {
+    edits[name] = edits[name] || [];
+    edits[name][i] = Object.assign({}, edits[name][i] || {}, patch);
+  }
+  function edit(name, i, patch, opts = {}) {
+    if (!opts.noSnap) snap();
+    setRaw(name, i, patch);
+    lsSet(packKey, edits);
+    refreshAll();
+  }
+
+  // ---------- Loading ----------
+  function loadImage(src) {
+    return new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = () => rej(new Error("Kunne ikke lese " + src)); im.src = src; });
+  }
+  async function useMeta(json, imageFor, name) {
+    meta = json;
+    sheets = {};
+    normCache.clear(); jumpReport = null;
+    for (const [key, s] of Object.entries(meta.sheets)) {
+      sheets[key] = await loadImage(await imageFor(s.file, key));
+    }
+    packKey = name;
+    edits = lsGet(packKey) || {};
+    undoStack.length = 0; redoStack.length = 0; updateUndo();
+    clipNames = Object.keys(meta.clips);
+    clipName = clipNames[0];
+    frameIdx = 0;
+    $("packName").textContent = name;
+    buildClipList();
+    selectClip(clipName);
+    setStatus("Pakken er lastet: " + clipNames.length + " klipp. Endringer huskes i denne nettleseren.", "ok");
+  }
+  async function loadBundled() {
+    try {
+      const json = await (await fetch("animations.json")).json();
+      await useMeta(json, async (file) => file, "Ekorn – spritepakke 2");
+    } catch (e) {
+      setStatus("Fant ingen pakke. Åpne en zip med animations.json og sprites/.", "warn");
+    }
+  }
+  $("fileIn").addEventListener("change", async (ev) => {
+    const files = [...ev.target.files];
+    if (!files.length) return;
+    try {
+      const zipFile = files.find((f) => f.name.toLowerCase().endsWith(".zip"));
+      if (zipFile) {
+        const zip = await JSZip.loadAsync(zipFile);
+        const jsonEntry = Object.values(zip.files).find((f) => /animations\.json$/i.test(f.name));
+        if (!jsonEntry) throw new Error("Zip-filen mangler animations.json");
+        const base = jsonEntry.name.replace(/animations\.json$/i, "");
+        const json = JSON.parse(await jsonEntry.async("string"));
+        await useMeta(json, async (file) => {
+          const entry = zip.file(base + file) || Object.values(zip.files).find((f) => f.name.endsWith(file.split("/").pop()));
+          if (!entry) throw new Error("Zip-filen mangler " + file);
+          return URL.createObjectURL(await entry.async("blob"));
+        }, zipFile.name.replace(/\.zip$/i, ""));
+      } else {
+        const jf = files.find((f) => f.name.toLowerCase().endsWith(".json"));
+        if (!jf) throw new Error("Velg animations.json sammen med PNG-arkene");
+        const json = JSON.parse(await jf.text());
+        await useMeta(json, async (file) => {
+          const want = file.split("/").pop();
+          const pf = files.find((f) => f.name === want);
+          if (!pf) throw new Error("Mangler " + want + ". Velg den sammen med JSON-filen.");
+          return URL.createObjectURL(pf);
+        }, jf.name.replace(/\.json$/i, ""));
+      }
+    } catch (e) {
+      setStatus(e.message, "warn");
+    }
+    ev.target.value = "";
+  });
+
+  // ---------- Clip list ----------
+  function buildClipList() {
+    const nav = $("clipList");
+    nav.innerHTML = "";
+    const groups = [["Løkker", clipNames.filter((n) => meta.clips[n].loop)], ["Overganger", clipNames.filter((n) => !meta.clips[n].loop)]];
+    for (const [title, names] of groups) {
+      if (!names.length) continue;
+      const h = document.createElement("h2"); h.textContent = title; nav.appendChild(h);
+      for (const n of names) {
+        const b = document.createElement("button");
+        b.type = "button"; b.className = "clip"; b.dataset.clip = n;
+        b.innerHTML = `<span class="dot"></span><span class="name"></span><span class="meta"></span>`;
+        b.querySelector(".name").textContent = n.replaceAll("_", " ");
+        b.addEventListener("click", () => selectClip(n));
+        nav.appendChild(b);
+      }
+    }
+  }
+  function refreshClipList() {
+    document.querySelectorAll(".clip").forEach((b) => {
+      const n = b.dataset.clip;
+      const count = frames(n).length;
+      let set = 0; for (let i = 0; i < count; i++) if (frameData(n, i).set) set++;
+      b.classList.toggle("on", n === clipName);
+      b.querySelector(".dot").className = "dot" + (set === count ? " done" : set > 0 ? " part" : "");
+      b.querySelector(".meta").textContent = set + "/" + count;
+    });
+  }
+  function selectClip(n) {
+    clipName = n; frameIdx = 0; seq = null; seqPos = 0; seqTime = 0;
+    if (jumpReport && jumpReport.clip !== n) jumpReport = null;
+    buildTimeline();
+    refreshAll();
+  }
+
+  // ---------- Timeline ----------
+  function buildTimeline() {
+    const tl = $("timeline");
+    tl.innerHTML = "";
+    frames().forEach((_, i) => {
+      const card = document.createElement("div");
+      card.className = "thumb"; card.tabIndex = 0; card.dataset.i = i;
+      card.innerHTML = `<canvas width="156" height="156"></canvas><div class="row"><span class="n">#${String(i + 1).padStart(2, "0")}</span><span class="mark"></span></div><input type="number" min="10" max="2000" step="5" aria-label="Varighet bilde ${i + 1} i millisekunder" id="dur-${i}"><div class="ms">ms</div><div class="jump" title="Endring fra forrige bilde"><i></i></div>`;
+      card.addEventListener("click", (e) => { if (e.target.tagName !== "INPUT") { frameIdx = i; refreshAll(); } });
+      card.querySelector("input").addEventListener("change", (e) => {
+        const v = Math.max(10, Math.min(2000, Math.round(+e.target.value || 0)));
+        edit(clipName, i, { d: v });
+      });
+      tl.appendChild(card);
+    });
+  }
+  function refreshTimeline() {
+    document.querySelectorAll(".thumb").forEach((card) => {
+      const i = +card.dataset.i;
+      const fd = frameData(clipName, i);
+      card.classList.toggle("on", i === frameIdx);
+      card.querySelector(".mark").classList.toggle("set", fd.set);
+      const jr = jumpReport && jumpReport.clip === clipName ? jumpReport : null;
+      const jb = card.querySelector(".jump");
+      if (jr) {
+        const v = jr.scores[i], bad = jr.bad.includes(i);
+        jb.firstElementChild.style.width = Math.min(100, (v / (jr.max || 1)) * 100) + "%";
+        jb.classList.toggle("bad", bad); card.classList.toggle("bad", bad);
+      } else { jb.firstElementChild.style.width = "0"; jb.classList.remove("bad"); card.classList.remove("bad"); }
+      const inp = card.querySelector("input");
+      if (document.activeElement !== inp) inp.value = fd.d;
+      const c = card.querySelector("canvas"), g = c.getContext("2d");
+      g.clearRect(0, 0, c.width, c.height);
+      const s = c.width / Math.max(fd.f.w, fd.f.h);
+      g.imageSmoothingEnabled = true;
+      drawXf(g, fd, c.width / 2, c.height / 2, s);
+      g.fillStyle = "#f2c14e"; g.beginPath(); g.arc(c.width / 2 + fd.tx * s, c.height / 2 + fd.ty * s, 3, 0, Math.PI * 2); g.fill();
+    });
+  }
+
+  // ---------- Editor canvas ----------
+  const ed = $("editor"), eg = ed.getContext("2d");
+  function checker(g, w, h, size) {
+    g.fillStyle = "#161826"; g.fillRect(0, 0, w, h);
+    g.fillStyle = "#1b1d2c";
+    for (let y = 0; y < h; y += size) for (let x = (y / size) % 2 ? size : 0; x < w; x += size * 2) g.fillRect(x, y, size, size);
+  }
+  // Skala: én rute fyller ca. 60 % av lerretet ved 100 %
+  function editorScale(fd) { return (ed.width * 0.6 / Math.max(fd.f.w, fd.f.h)) * +$("zoom").value; }
+  function placeFor(fd, z) {
+    // Returnerer øvre venstre hjørne for ruten
+    if (view === "aligned") return [ed.width / 2 - fd.ax * z, ed.height / 2 - fd.ay * z];
+    return [ed.width / 2 - fd.f.w * z / 2, ed.height / 2 - fd.f.h * z / 2];
+  }
+  function onionFrame() {
+    const mode = $("onion").value;
+    const n = frames().length;
+    if (mode === "off") return null;
+    if (mode === "prev") return frameIdx > 0 ? frameData(clipName, frameIdx - 1) : (clip().loop ? frameData(clipName, n - 1) : null);
+    if (mode === "first") return frameIdx > 0 ? frameData(clipName, 0) : null;
+    if (mode === "target") {
+      const t = clip().next || clip().to;
+      return t && meta.clips[t] ? frameData(t, 0) : null;
+    }
+    return null;
+  }
+  function drawEditor() {
+    const fd = frameData(clipName, frameIdx);
+    const z = editorScale(fd);
+    eg.imageSmoothingEnabled = true;
+    checker(eg, ed.width, ed.height, 32);
+    const on = onionFrame();
+    const cx = ed.width / 2, cy = ed.height / 2;
+    if (on) {
+      const zo = z * (Math.max(fd.f.w, fd.f.h) / Math.max(on.f.w, on.f.h));
+      if (view === "aligned") drawXf(eg, on, cx, cy, zo, 0.3);
+      else { eg.globalAlpha = 0.3; eg.drawImage(on.sheet, on.f.x, on.f.y, on.f.w, on.f.h, cx - on.f.w * zo / 2, cy - on.f.h * zo / 2, on.f.w * zo, on.f.h * zo); eg.globalAlpha = 1; }
+    }
+    let ax, ay;
+    if (view === "aligned") {
+      // Det som kommer med i appen: kvadrat med ankeret i midten
+      const side = Math.max(fd.f.w, fd.f.h) * z;
+      eg.save(); eg.setLineDash([10, 8]); eg.strokeStyle = "rgba(145,132,217,.7)"; eg.lineWidth = 2;
+      eg.strokeRect(cx - side / 2, cy - side / 2, side, side); eg.restore();
+      eg.strokeStyle = "rgba(255,255,255,.18)"; eg.lineWidth = 1;
+      eg.beginPath(); eg.moveTo(cx, cy - side / 2); eg.lineTo(cx, cy + side / 2); eg.moveTo(cx - side / 2, cy); eg.lineTo(cx + side / 2, cy); eg.stroke();
+      drawXf(eg, fd, cx, cy, z, 1, "rgba(255,255,255,.14)");
+      ax = cx + fd.tx * z; ay = cy + fd.ty * z;
+    } else {
+      const [x, y] = placeFor(fd, z);
+      eg.strokeStyle = "rgba(255,255,255,.12)"; eg.lineWidth = 2;
+      eg.strokeRect(x, y, fd.f.w * z, fd.f.h * z);
+      eg.drawImage(fd.sheet, fd.f.x, fd.f.y, fd.f.w, fd.f.h, x, y, fd.f.w * z, fd.f.h * z);
+      ax = x + fd.ax * z; ay = y + fd.ay * z;
+    }
+    // Anker: kryss over hele lerretet + ring
+    eg.strokeStyle = "rgba(242,193,78,.55)"; eg.lineWidth = 2;
+    eg.beginPath(); eg.moveTo(ax, 0); eg.lineTo(ax, ed.height); eg.moveTo(0, ay); eg.lineTo(ed.width, ay); eg.stroke();
+    eg.strokeStyle = "#f2c14e"; eg.lineWidth = 3;
+    eg.beginPath(); eg.arc(ax, ay, 12, 0, Math.PI * 2); eg.stroke();
+    eg.fillStyle = "#f2c14e"; eg.beginPath(); eg.arc(ax, ay, 3.5, 0, Math.PI * 2); eg.fill();
+  }
+  let tool = "anchor", drag = null;
+  function setTool(t) {
+    tool = t;
+    document.querySelectorAll("[data-tool]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.tool === t));
+    ed.style.cursor = { anchor: "crosshair", move: "move", rotate: "grab", scale: "nwse-resize" }[t];
+    if (t !== "anchor" && view !== "aligned") $("viewAligned").click();
+  }
+  document.querySelectorAll("[data-tool]").forEach((b) => b.addEventListener("click", () => setTool(b.dataset.tool)));
+  const targets = () => $("allFrames").checked ? frames().map((_, i) => i) : [frameIdx];
+  function canvasPt(e) {
+    const r = ed.getBoundingClientRect();
+    return [(e.clientX - r.left) * ed.width / r.width, (e.clientY - r.top) * ed.height / r.height];
+  }
+  // Fra lerretet til rutens piksler (tar hensyn til formen i justert visning)
+  function toCell(fd, px, py) {
+    const z = editorScale(fd);
+    if (view !== "aligned") { const [x, y] = placeFor(fd, z); return [(px - x) / z, (py - y) / z]; }
+    let ux = (px - ed.width / 2) / z - fd.tx, uy = (py - ed.height / 2) / z - fd.ty;
+    const a = -fd.rot * Math.PI / 180, c = Math.cos(a), s = Math.sin(a);
+    const vx = c * ux - s * uy, vy = s * ux + c * uy;
+    return [fd.ax + vx / (fd.sc * (fd.fx ? -1 : 1)), fd.ay + vy / fd.sc];
+  }
+  ed.addEventListener("pointerdown", (e) => {
+    if (!meta) return;
+    const [px, py] = canvasPt(e);
+    const fd = frameData(clipName, frameIdx);
+    const z = editorScale(fd);
+    if (tool === "anchor") {
+      let [ax, ay] = toCell(fd, px, py);
+      ax = Math.round(ax); ay = Math.round(ay);
+      if (ax < 0 || ay < 0 || ax > fd.f.w || ay > fd.f.h) { setStatus("Klikk innenfor ruten.", "warn"); return; }
+      edit(clipName, frameIdx, { ax, ay });
+      setStatus(`Anker for bilde ${frameIdx + 1} satt til ${ax}, ${ay}.`);
+      return;
+    }
+    snap();
+    const pivot = [ed.width / 2 + fd.tx * z, ed.height / 2 + fd.ty * z];
+    drag = { px, py, z, pivot, start: targets().map((i) => [i, frameData(clipName, i)]),
+      a0: Math.atan2(py - pivot[1], px - pivot[0]), d0: Math.max(8, Math.hypot(px - pivot[0], py - pivot[1])) };
+    ed.setPointerCapture(e.pointerId);
+    if (tool === "rotate") ed.style.cursor = "grabbing";
+  });
+  ed.addEventListener("pointermove", (e) => {
+    if (!drag) return;
+    const [px, py] = canvasPt(e);
+    const { z, pivot } = drag;
+    for (const [i, f0] of drag.start) {
+      if (tool === "move") setRaw(clipName, i, { tx: round1(f0.tx + (px - drag.px) / z), ty: round1(f0.ty + (py - drag.py) / z) });
+      else if (tool === "rotate") {
+        let d = (Math.atan2(py - pivot[1], px - pivot[0]) - drag.a0) * 180 / Math.PI;
+        let r = f0.rot + d; if (e.shiftKey) r = Math.round(r / 15) * 15;
+        setRaw(clipName, i, { rot: round1(wrapDeg(r)) });
+      } else if (tool === "scale") {
+        const k = Math.max(8, Math.hypot(px - pivot[0], py - pivot[1])) / drag.d0;
+        setRaw(clipName, i, { sc: Math.round(Math.min(4, Math.max(0.1, f0.sc * k)) * 1000) / 1000 });
+      }
+    }
+    drawEditor(); updateInfo();
+  });
+  const endDrag = () => { if (!drag) return; drag = null; setTool(tool); lsSet(packKey, edits); refreshAll(); };
+  ed.addEventListener("pointerup", endDrag); ed.addEventListener("pointercancel", endDrag);
+  const round1 = (v) => Math.round(v * 10) / 10;
+  const wrapDeg = (r) => ((r + 180) % 360 + 360) % 360 - 180;
+  function nudge(dx, dy) {
+    if (tool === "move") {
+      snap();
+      for (const i of targets()) { const fd = frameData(clipName, i); setRaw(clipName, i, { tx: round1(fd.tx + dx), ty: round1(fd.ty + dy) }); }
+      lsSet(packKey, edits); refreshAll(); return;
+    }
+    const fd = frameData(clipName, frameIdx);
+    edit(clipName, frameIdx, { ax: Math.round(fd.ax + dx), ay: Math.round(fd.ay + dy) });
+  }
+  function xfAll(fn) {
+    snap();
+    for (const i of targets()) setRaw(clipName, i, fn(frameData(clipName, i)));
+    lsSet(packKey, edits); refreshAll();
+  }
+
+  // ---------- Preview (64 dp ≈ 192 px, som i appen) ----------
+  const pv = $("preview"), pg = pv.getContext("2d");
+  let seq = null, seqPos = 0, seqTime = 0, lastT = 0;
+  function buildSeq() {
+    const c = clip();
+    const chain = $("chain").checked && !c.loop && c.from && c.next && meta.clips[c.from] && meta.clips[c.next];
+    const list = [];
+    const add = (n) => frames(n).forEach((_, i) => list.push([n, i]));
+    if (chain) { add(c.from); add(c.from); add(clipName); add(c.next); add(c.next); }
+    else add(clipName);
+    $("previewHelp").textContent = chain
+      ? `Spiller ${c.from} ×2 → ${clipName} → ${c.next} ×2, med ankeret fast i midten.`
+      : "Spiller klippet med ankeret fast i midten, i samme størrelse som i appen.";
+    return list;
+  }
+  function drawFrameTo(g, size, name, i, alpha) {
+    const fd = frameData(name, i);
+    drawXf(g, fd, size / 2, size / 2, size / Math.max(fd.f.w, fd.f.h), alpha);
+  }
+  function drawPreview(name, i, blendNext) {
+    pg.clearRect(0, 0, pv.width, pv.height);
+    pg.fillStyle = "#161826"; pg.fillRect(0, 0, pv.width, pv.height);
+    pg.imageSmoothingEnabled = true;
+    // Samme regel som importskriptet: ruten skaleres til full bredde, ankeret havner i midten
+    drawFrameTo(pg, pv.width, name, i, 1);
+    // Myk blanding: neste bilde tones inn over det nåværende, slik appen gjør
+    if (blendNext) drawFrameTo(pg, pv.width, blendNext[0], blendNext[1], blendNext[2]);
+  }
+  function tick(t) {
+    const dt = lastT ? t - lastT : 0; lastT = t;
+    if (!seq) seq = buildSeq();
+    if (playing) {
+      seqTime += dt;
+      let [n, i] = seq[seqPos];
+      while (seqTime >= frameData(n, i).d) {
+        seqTime -= frameData(n, i).d;
+        seqPos = (seqPos + 1) % seq.length;
+        [n, i] = seq[seqPos];
+        if (n === clipName) { frameIdx = i; drawEditor(); refreshTimelineSel(); updateInfo(); }
+      }
+      const cur = frameData(n, i);
+      const [nn, ni] = seq[(seqPos + 1) % seq.length];
+      drawPreview(n, i, $("blend").checked && nn === n ? [nn, ni, Math.min(1, seqTime / cur.d)] : null);
+    } else {
+      drawPreview(clipName, frameIdx);
+    }
+    requestAnimationFrame(tick);
+  }
+  function refreshTimelineSel() { document.querySelectorAll(".thumb").forEach((c) => c.classList.toggle("on", +c.dataset.i === frameIdx)); }
+
+  // ---------- Automatikk: sporing av anker og hakk-måling ----------
+  // Alle bilder gjengis i et felles normalisert rom (N × N), uavhengig av rutestørrelse.
+  const N = 128;
+  const normCache = new Map();
+  function normData(name, i) {
+    const key = name + "#" + i;
+    if (normCache.has(key)) return normCache.get(key);
+    const fd = frameData(name, i);
+    const side = Math.max(fd.f.w, fd.f.h);
+    const c = document.createElement("canvas"); c.width = N; c.height = N;
+    const g = c.getContext("2d", { willReadFrequently: true });
+    g.drawImage(fd.sheet, fd.f.x, fd.f.y, fd.f.w, fd.f.h, 0, 0, fd.f.w * N / side, fd.f.h * N / side);
+    const out = { px: g.getImageData(0, 0, N, N).data, k: N / side };
+    normCache.set(key, out);
+    return out;
+  }
+  // Finn forskyvningen som får lappen rundt (ax, ay) i bilde A til å passe best i bilde B.
+  function match(A, ax, ay, B, P = 14, R = 18) {
+    let best = Infinity, bx = 0, by = 0;
+    for (let dy = -R; dy <= R; dy++) for (let dx = -R; dx <= R; dx++) {
+      let sum = 0, w = 0;
+      for (let y = -P; y <= P; y += 2) for (let x = -P; x <= P; x += 2) {
+        const xa = Math.round(ax + x), ya = Math.round(ay + y), xb = xa + dx, yb = ya + dy;
+        if (xa < 0 || ya < 0 || xa >= N || ya >= N || xb < 0 || yb < 0 || xb >= N || yb >= N) { sum += 255; w++; continue; }
+        const ia = (ya * N + xa) * 4, ib = (yb * N + xb) * 4;
+        const aa = A[ia + 3], ab = B[ib + 3];
+        if (aa < 20 && ab < 20) continue;
+        sum += Math.abs(A[ia] * aa - B[ib] * ab) / 255 + Math.abs(A[ia + 1] * aa - B[ib + 1] * ab) / 255
+             + Math.abs(A[ia + 2] * aa - B[ib + 2] * ab) / 255 + Math.abs(aa - ab);
+        w++;
+      }
+      const score = w ? sum / w + 0.15 * Math.hypot(dx, dy) : Infinity;
+      if (score < best) { best = score; bx = dx; by = dy; }
+    }
+    return [bx, by];
+  }
+  function anchorNorm(name, i) { const fd = frameData(name, i), k = normData(name, i).k; return [fd.ax * k, fd.ay * k]; }
+  function setAnchorNorm(name, i, x, y) {
+    const k = normData(name, i).k;
+    edits[name] = edits[name] || [];
+    edits[name][i] = Object.assign({}, edits[name][i], { ax: Math.round(x / k), ay: Math.round(y / k) });
+  }
+  function autoTrack(name) {
+    const c = meta.clips[name], n = frames(name).length;
+    // Startpunkt: overgangens første bilde spores fra løkka den kommer fra (dens første bilde)
+    let [px, py] = anchorNorm(name, 0);
+    if (!c.loop && c.from && meta.clips[c.from]) {
+      const [fx, fy] = anchorNorm(c.from, 0);
+      const [dx, dy] = match(normData(c.from, 0).px, fx, fy, normData(name, 0).px);
+      px = fx + dx; py = fy + dy;
+      setAnchorNorm(name, 0, px, py);
+    }
+    const pts = [[px, py]];
+    for (let i = 1; i < n; i++) {
+      const [dx, dy] = match(normData(name, i - 1).px, pts[i - 1][0], pts[i - 1][1], normData(name, i).px);
+      pts.push([pts[i - 1][0] + dx, pts[i - 1][1] + dy]);
+    }
+    // Lukk sløyfa: siste bilde skal føre tilbake til første (løkke) eller til målløkka (overgang)
+    let target = null;
+    if (c.loop) {
+      const [dx, dy] = match(normData(name, n - 1).px, pts[n - 1][0], pts[n - 1][1], normData(name, 0).px);
+      target = [pts[n - 1][0] + dx - pts[0][0], pts[n - 1][1] + dy - pts[0][1]]; // drift over runden
+      for (let i = 1; i < n; i++) { pts[i][0] -= target[0] * i / n; pts[i][1] -= target[1] * i / n; }
+    }
+    for (let i = 1; i < n; i++) setAnchorNorm(name, i, pts[i][0], pts[i][1]);
+    lsSet(packKey, edits);
+    return target ? Math.hypot(target[0], target[1]) / normData(name, 0).k : 0;
+  }
+  // Hakk: hvor mye endrer bildet seg fra forrige, med ankrene stilt over hverandre
+  function diffAligned(name, i, j) {
+    const A = normData(name, i).px, B = normData(name, j).px;
+    const [ax, ay] = anchorNorm(name, i), [bx, by] = anchorNorm(name, j);
+    const ox = Math.round(bx - ax), oy = Math.round(by - ay);
+    let sum = 0, cnt = 0;
+    for (let y = 0; y < N; y += 2) for (let x = 0; x < N; x += 2) {
+      const xb = x + ox, yb = y + oy;
+      const aa = A[(y * N + x) * 4 + 3];
+      const ab = (xb >= 0 && yb >= 0 && xb < N && yb < N) ? B[(yb * N + xb) * 4 + 3] : 0;
+      if (aa < 20 && ab < 20) continue;
+      sum += Math.abs(aa - ab) / 255; cnt++;
+    }
+    return cnt ? sum / cnt : 0;
+  }
+  let jumpReport = null;
+  function analyse(name) {
+    const c = meta.clips[name], n = frames(name).length;
+    const scores = [];
+    for (let i = 0; i < n; i++) {
+      if (i === 0) scores.push(c.loop ? diffAligned(name, n - 1, 0) : 0);
+      else scores.push(diffAligned(name, i - 1, i));
+    }
+    const sorted = scores.filter((v, i) => c.loop || i > 0).slice().sort((a, b) => a - b);
+    const med = sorted[Math.floor(sorted.length / 2)] || 0;
+    const bad = scores.map((v, i) => (v > med * 1.6 && v > 0.08 ? i : -1)).filter((i) => i >= 0);
+    return { clip: name, scores, med, max: Math.max(...scores), bad };
+  }
+  function showFindings(reports) {
+    const ul = $("findings"); ul.innerHTML = "";
+    const items = [];
+    for (const r of reports) for (const i of r.bad) items.push([r, i]);
+    if (!items.length) {
+      const li = document.createElement("li"); li.textContent = "Ingen bilder skiller seg tydelig ut. Hakking skyldes da mest få bilder per runde."; ul.appendChild(li); return;
+    }
+    items.sort((a, b) => b[0].scores[b[1]] / (b[0].med || 1) - a[0].scores[a[1]] / (a[0].med || 1));
+    for (const [r, i] of items.slice(0, 12)) {
+      const n = frames(r.clip).length, prev = i === 0 ? n : i;
+      const li = document.createElement("li"); li.className = "bad"; li.tabIndex = 0;
+      li.textContent = `${r.clip.replaceAll("_", " ")}: bilde ${prev} → ${i + 1} endrer seg ${(r.scores[i] / (r.med || 1)).toFixed(1)}× mer enn vanlig. Sjekk ankeret, eller gi bilde ${prev} litt kortere tid.`;
+      li.addEventListener("click", () => { if (clipName !== r.clip) selectClip(r.clip); frameIdx = i; jumpReport = r; refreshAll(); });
+      ul.appendChild(li);
+    }
+  }
+  $("autoClip").onclick = () => {
+    snap();
+    const drift = autoTrack(clipName); normCache.clear(); jumpReport = analyse(clipName); refreshAll(); showFindings([jumpReport]);
+    setStatus(`Auto-anker for ${clipName} er ferdig` + (drift > 1 ? ` (rettet ${drift.toFixed(0)} px drift over runden).` : "."), "ok");
+  };
+  $("autoAll").onclick = () => {
+    snap();
+    const loops = clipNames.filter((n) => meta.clips[n].loop), trans = clipNames.filter((n) => !meta.clips[n].loop);
+    [...loops, ...trans].forEach((n) => autoTrack(n));
+    normCache.clear();
+    const reports = clipNames.map(analyse); jumpReport = reports.find((r) => r.clip === clipName);
+    refreshAll(); showFindings(reports);
+    setStatus("Auto-anker er satt for alle klipp. Se over listen med hakk.", "ok");
+  };
+  $("findJumps").onclick = () => { jumpReport = analyse(clipName); refreshAll(); showFindings([jumpReport]); };
+  $("findAll").onclick = () => { const reports = clipNames.map(analyse); jumpReport = reports.find((r) => r.clip === clipName); refreshAll(); showFindings(reports); };
+
+  // ---------- Info, export ----------
+  function updateInfo() {
+    const fd = frameData(clipName, frameIdx);
+    $("kClip").textContent = clipName;
+    $("kFrame").textContent = `${frameIdx + 1} av ${frames().length}`;
+    $("kAnchor").textContent = `${Math.round(fd.ax)}, ${Math.round(fd.ay)}${fd.set ? "" : " (midten)"}`;
+    $("kDur").textContent = fd.d + " ms";
+    $("kXf").textContent = hasXf(fd) ? `${round1(fd.tx)}, ${round1(fd.ty)} · ${round1(fd.rot)}° · ${Math.round(fd.sc * 100)} %${fd.fx ? " · speilet" : ""}` : "ingen";
+    const setIf = (id, v) => { if (document.activeElement !== $(id)) $(id).value = v; };
+    setIf("xfX", round1(fd.tx)); setIf("xfY", round1(fd.ty)); setIf("xfR", round1(fd.rot)); setIf("xfRr", round1(fd.rot));
+    setIf("xfS", Math.round(fd.sc * 1000) / 10); $("xfF").checked = !!fd.fx;
+  }
+  function exportJson() {
+    const out = JSON.parse(JSON.stringify(meta));
+    out.anchorsEditedWith = "Ekorn Sprite-studio";
+    for (const n of Object.keys(out.clips)) {
+      out.clips[n].frames.forEach((f, i) => {
+        const fd = frameData(n, i);
+        f.anchor = { x: Math.round(fd.ax), y: Math.round(fd.ay) };
+        f.durationMs = fd.d;
+        if (hasXf(fd)) f.transform = { x: round1(fd.tx), y: round1(fd.ty), rotation: round1(fd.rot), scale: Math.round(fd.sc * 1000) / 1000, flipX: !!fd.fx };
+        else delete f.transform;
+      });
+    }
+    return JSON.stringify(out, null, 2);
+  }
+  function refreshAll() {
+    drawEditor(); refreshTimeline(); refreshClipList(); updateInfo();
+    seq = null; seqPos = 0; seqTime = 0;
+    $("jsonOut").value = exportJson();
+  }
+
+  // ---------- Controls ----------
+  $("prevBtn").onclick = () => { frameIdx = (frameIdx - 1 + frames().length) % frames().length; refreshAll(); };
+  $("nextBtn").onclick = () => { frameIdx = (frameIdx + 1) % frames().length; refreshAll(); };
+  $("playBtn").onclick = () => {
+    playing = !playing;
+    $("playBtn").setAttribute("aria-pressed", playing); $("playBtn").textContent = playing ? "❚❚ Stopp" : "▶ Spill";
+    seq = null; seqPos = 0; seqTime = 0;
+  };
+  $("viewAligned").onclick = () => { view = "aligned"; $("viewAligned").setAttribute("aria-pressed", true); $("viewRaw").setAttribute("aria-pressed", false); drawEditor(); };
+  $("viewRaw").onclick = () => { view = "raw"; $("viewRaw").setAttribute("aria-pressed", true); $("viewAligned").setAttribute("aria-pressed", false); drawEditor(); };
+  $("onion").onchange = drawEditor; $("zoom").onchange = drawEditor; $("chain").onchange = () => { seq = null; seqPos = 0; };
+  document.querySelectorAll("[data-n]").forEach((b) => b.addEventListener("click", () => { const [dx, dy] = b.dataset.n.split(",").map(Number); nudge(dx, dy); }));
+  $("resetAnchor").onclick = () => { if (edits[clipName]?.[frameIdx]) { snap(); delete edits[clipName][frameIdx].ax; delete edits[clipName][frameIdx].ay; lsSet(packKey, edits); refreshAll(); } };
+  $("anchorFromPrev").onclick = () => { if (frameIdx > 0) { const p = frameData(clipName, frameIdx - 1); edit(clipName, frameIdx, { ax: p.ax, ay: p.ay }); } };
+  $("anchorToAll").onclick = () => {
+    const p = frameData(clipName, frameIdx);
+    snap();
+    frames().forEach((_, i) => { edits[clipName] = edits[clipName] || []; edits[clipName][i] = Object.assign({}, edits[clipName][i], { ax: p.ax, ay: p.ay }); });
+    lsSet(packKey, edits); refreshAll(); setStatus("Ankeret er kopiert til alle bildene i " + clipName + ". Juster bildene som avviker.");
+  };
+  $("durAllBtn").onclick = () => {
+    const v = Math.max(10, Math.min(2000, Math.round(+$("durAll").value || 0)));
+    if (!v) return;
+    snap();
+    frames().forEach((_, i) => { edits[clipName] = edits[clipName] || []; edits[clipName][i] = Object.assign({}, edits[clipName][i], { d: v }); });
+    lsSet(packKey, edits); refreshAll(); setStatus(`Alle bildene i ${clipName} varer nå ${v} ms.`);
+  };
+  // Tallfelt: settes på valgte bilde(r). Med «Alle bilder» flyttes alle like mye (relativt).
+  const numIn = (id, key, conv = (v) => v) => $(id).addEventListener("change", () => {
+    const v = conv(+$(id).value); if (!isFinite(v)) return;
+    const cur = frameData(clipName, frameIdx)[key];
+    xfAll((fd) => ({ [key]: key === "sc" ? Math.max(0.1, Math.min(4, fd.sc * v / (cur || 1))) : (key === "rot" ? wrapDeg(fd.rot + v - cur) : fd[key] + v - cur) }));
+  });
+  numIn("xfX", "tx"); numIn("xfY", "ty"); numIn("xfR", "rot"); numIn("xfS", "sc", (v) => v / 100);
+  $("xfRr").addEventListener("input", () => { $("xfR").value = $("xfRr").value; });
+  $("xfRr").addEventListener("change", () => { $("xfR").dispatchEvent(new Event("change")); });
+  $("xfF").addEventListener("change", () => { const on = $("xfF").checked; xfAll(() => ({ fx: on })); });
+  $("xfReset").onclick = () => xfAll(() => ({ tx: 0, ty: 0, rot: 0, sc: 1, fx: false }));
+  $("xfFromPrev").onclick = () => {
+    const n = frames().length; const j = frameIdx > 0 ? frameIdx - 1 : (clip().loop ? n - 1 : -1);
+    if (j < 0) return; const p = frameData(clipName, j);
+    edit(clipName, frameIdx, { tx: p.tx, ty: p.ty, rot: p.rot, sc: p.sc, fx: p.fx });
+  };
+  $("xfToAll").onclick = () => {
+    const p = frameData(clipName, frameIdx); snap();
+    frames().forEach((_, i) => setRaw(clipName, i, { tx: p.tx, ty: p.ty, rot: p.rot, sc: p.sc, fx: p.fx }));
+    lsSet(packKey, edits); refreshAll(); setStatus("Formen er kopiert til alle bildene i " + clipName + ".");
+  };
+  $("undoBtn").onclick = undo; $("redoBtn").onclick = redo;
+  document.addEventListener("keydown", (e) => {
+    if (!meta) return;
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") { e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "y") { e.preventDefault(); redo(); return; }
+    if (["INPUT", "SELECT", "TEXTAREA"].includes(document.activeElement.tagName) && document.activeElement.type !== "checkbox") return;
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    const k = e.key.toLowerCase();
+    if (k === "a") return setTool("anchor");
+    if (k === "v") return setTool("move");
+    if (k === "r") return setTool("rotate");
+    if (k === "s") return setTool("scale");
+    if (k === "h") return xfAll((fd) => ({ fx: !fd.fx }));
+    if (k === "q" || k === "e") { const d = (e.shiftKey ? 5 : 1) * (k === "q" ? -1 : 1); return xfAll((fd) => ({ rot: wrapDeg(round1(fd.rot + d)) })); }
+    if (e.key === "+" || e.key === "=" || e.key === "-") { const d = e.key === "-" ? -0.01 : 0.01; return xfAll((fd) => ({ sc: Math.max(0.1, Math.min(4, Math.round((fd.sc + d) * 1000) / 1000)) })); }
+    const step = e.shiftKey ? 5 : 1;
+    const map = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] };
+    if (map[e.key]) { e.preventDefault(); nudge(...map[e.key]); }
+    else if (e.key === ",") $("prevBtn").click();
+    else if (e.key === ".") $("nextBtn").click();
+    else if (e.key === " ") { e.preventDefault(); $("playBtn").click(); }
+  });
+
+  $("copyBtn").onclick = async () => {
+    const text = exportJson();
+    try { await navigator.clipboard.writeText(text); setStatus("JSON er kopiert. Lim den inn i chatten eller lagre den som animations.json.", "ok"); }
+    catch (e) { const ta = $("jsonOut"); ta.focus(); ta.select(); setStatus("Kopier teksten i JSON-feltet (den er markert).", "warn"); }
+  };
+  let downloads = null;
+  (async () => { try { downloads = await window.claude?.use?.("downloads"); } catch (e) { downloads = null; } if (!downloads) $("saveBtn").hidden = true; })();
+  $("saveBtn").onclick = async () => {
+    if (!downloads) return;
+    try { await downloads.save({ filename: "animations.json", data: exportJson() }); setStatus("animations.json er lagret. Send den til Claude, så tas den inn i appen.", "ok"); }
+    catch (e) {
+      if (e?.code === "declined") setStatus("Lagring avbrutt.", "warn");
+      else if (e?.code === "rate_limited") setStatus("Vent litt og prøv igjen.", "warn");
+      else { setStatus("Lagring virker ikke her. Bruk «Kopier JSON» i stedet.", "warn"); $("saveBtn").hidden = true; }
+    }
+  };
+
+  loadBundled().then(() => requestAnimationFrame(tick));
+})();
+</script>

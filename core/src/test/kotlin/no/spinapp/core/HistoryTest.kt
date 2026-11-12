@@ -1,0 +1,87 @@
+package no.spinapp.core
+
+import java.time.LocalDate
+import java.time.ZoneOffset
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
+
+class HistoryTest {
+    private fun rec(t: Long, d: Int = 3600, tss: Int = 50, b20: Int? = null, test: Int? = null) =
+        RideRecord(t, "id", "Økt", d, 150, 160, 400, 88, 540, tss, 80, 75, b20, 200, test)
+
+    @Test
+    fun jsonRoundTripIsSmall() {
+        val r = rec(1_700_000_000, b20 = 210)
+        val json = r.toJson()
+        assertEquals(r, RideRecord.fromJson(json))
+        assertTrue(json.length < 400, "${json.length} byte")
+        val withTrace = r.copy(trace = List(240) { 150 + it % 50 })
+        assertEquals(withTrace, RideRecord.fromJson(withTrace.toJson()))
+        assertTrue(withTrace.toJson().length < 1500, "${withTrace.toJson().length} byte med spor")
+        assertEquals(null, RideRecord.fromJson("ødelagt"))
+        assertEquals(null, RideRecord.fromJson(rec(1, test = null).toJson())?.ftpTestResult)
+    }
+
+    @Test
+    fun pruneByAgeAndCount() {
+        val now = 1_800_000_000L
+        val old = rec(now - 200 * 86400L)
+        val recent = rec(now - 10 * 86400L)
+        assertEquals(listOf(recent), HistoryPolicy.prune(listOf(old, recent), now, Retention.MONTHS_6))
+        assertEquals(2, HistoryPolicy.prune(listOf(old, recent), now, Retention.FOREVER).size)
+        val many = (1..1200).map { rec(now - it.toLong()) }
+        val pruned = HistoryPolicy.prune(many, now, Retention.FOREVER)
+        assertEquals(HistoryPolicy.MAX_RECORDS, pruned.size)
+        assertEquals(now - 1, pruned.last().startedAtEpochSec) // nyeste beholdes
+    }
+
+    @Test
+    fun shortRidesAreNotStored() {
+        assertTrue(!HistoryPolicy.shouldStore(rec(0, d = 120)))
+        assertTrue(HistoryPolicy.shouldStore(rec(0, d = 1800)))
+    }
+
+    @Test
+    fun weekStats() {
+        // Mandag 9. nov 2026
+        val monday = LocalDate.of(2026, 11, 9)
+        val t = monday.atTime(18, 0).toEpochSecond(ZoneOffset.UTC)
+        val lastWeek = t - 3 * 86400L
+        val s = HistoryStats.week(listOf(rec(t, tss = 60), rec(t + 86400, tss = 40), rec(lastWeek)), monday.plusDays(2), ZoneOffset.UTC)
+        assertEquals(2, s.rides)
+        assertEquals(100, s.tss)
+        assertEquals(120, s.minutes)
+    }
+
+    @Test
+    fun ftpEstimate() {
+        val now = 2_000_000_000L
+        assertNull(HistoryStats.bestFtpEstimate(listOf(rec(now)), now))
+        assertEquals(209, HistoryStats.bestFtpEstimate(listOf(rec(now, b20 = 220)), now))
+        assertEquals(230, HistoryStats.bestFtpEstimate(listOf(rec(now, b20 = 220), rec(now, test = 230)), now))
+        assertNull(HistoryStats.bestFtpEstimate(listOf(rec(now - 100 * 86400L, test = 300)), now))
+    }
+}
+
+class HistoryZoneTest {
+    @Test
+    fun zoneSecondsRoundTripAndWeeks() {
+        val r = RideRecord(java.time.LocalDate.of(2026, 11, 10).atTime(18, 0).toEpochSecond(java.time.ZoneOffset.UTC),
+            "id", "Økt", 3600, 150, 160, 400, 88, 540, 50, 80, 75, null, 200, null, listOf(600, 1200, 0, 0, 1800, 0, 0, 0))
+        val back = RideRecord.fromJson(r.toJson())!!
+        kotlin.test.assertEquals(r.zoneSec, back.zoneSec)
+        val weeks = HistoryStats.zoneMinutesByWeek(listOf(r), java.time.LocalDate.of(2026, 11, 12), 8, java.time.ZoneOffset.UTC)
+        kotlin.test.assertEquals(8, weeks.size)
+        kotlin.test.assertEquals(listOf(10, 20, 0, 0, 30, 0, 0, 0), weeks.last().toList())
+        kotlin.test.assertEquals(0, weeks.first().sum())
+    }
+
+    @Test
+    fun workoutZoneSeconds() {
+        val z = WorkoutLibrary.threshold.zoneSeconds()
+        kotlin.test.assertEquals(WorkoutLibrary.threshold.durationSec, z.sum())
+        kotlin.test.assertEquals(3 * 480, z[Zone.Z5.ordinal])
+    }
+}
